@@ -36,6 +36,7 @@
 
 import math
 from typing import Optional
+from matplotlib import cm
 
 import numpy as np
 
@@ -59,10 +60,10 @@ class FWLongitudinal(gym.Env):
     |-----|--------------------------------------|------|-----|----------------|
     | 0   | position of the plane (horizontal)   | -Inf | Inf | position (m)   |
     | 1   | position of the plane (altitude)     | -Inf | Inf | position (m)   |
-    | 1   | horizontal velocity of the plane     | -Inf | Inf | velocity (m/s) |
-    | 2   | vertical   velocity of the plane     | -Inf | Inf | velocity (m/s) |
-    | 3   | pitch of the plane                   | -PI  | PI  | rad            |
-    | 4   | pitch rate of the plane              | -Inf | Inf | rad/s          |
+    | 2   | horizontal velocity of the plane     | -Inf | Inf | velocity (m/s) |
+    | 3   | vertical   velocity of the plane     | -Inf | Inf | velocity (m/s) |
+    | 4   | pitch of the plane                   | -PI  | PI  | rad            |
+    | 5   | pitch rate of the plane              | -Inf | Inf | rad/s          |
 
     ### Action Space
 
@@ -71,8 +72,8 @@ class FWLongitudinal(gym.Env):
 
     | Num | Action                               | Min  | Max | Unit           |
     |-----|--------------------------------------|------|-----|----------------|
-    | 0   | Throttle of the plane (horizontal)   | -1   | 1   | position (m)   |
-    | 1   | position of the plane (altitude)     | -1   | 1   | position (m)   |
+    | 0   | throttle of the plane                | -1   | 1   | position (m)   |
+    | 1   | elevator position of the plane       | -1   | 1   | position (m)   |
 
     ### Transition Dynamics:
 
@@ -117,7 +118,26 @@ class FWLongitudinal(gym.Env):
     }
 
     def __init__(self, render_mode: Optional[str] = None, goal_velocity=0):
-        self.mass = 1.0 # Mass of the vehicle
+        # TODO: adapt these values to get more realistic results
+        self.mass = 20.0     # Mass of the vehicle
+        self.gravity = 9.81 # Gravity
+        self.chord = 0.5    # Chord length
+        self.span = 4.0     # Span length
+        self.rho = 1.225    # Air density
+        self.Iyy = 20.0      # Moment of inertia
+        self.Sref = self.chord * self.span  # Reference area
+        self.ar = self.span**2 / self.Sref  # Aspect ratio
+
+        # TODO: determine these values through system identification
+        self.cm0 = 0.01           # Moment coefficient at zero angle of attack
+        self.cmalpha = -0.487     # Moment coefficient slope
+        self.cmdelta = -0.015     # Moment coefficient slope with elevator deflection
+        self.cmq = -13.8          # Moment damping coefficient
+        self.cl0 = 0.2            # Lift coefficient at zero angle of attack
+        self.clalpha = 2 * np.pi  # Lift coefficient slope (ideally 2*pi)
+        self.cldelta = 0.1        # Lift coefficient slope with elevator deflection
+        self.cd0 = 0.03           # Drag coefficient at zero angle of attack
+
         self.dt = 0.03
         self.min_action = -1.0
         self.max_action = 1.0
@@ -155,19 +175,47 @@ class FWLongitudinal(gym.Env):
         self.gravity = np.array([0.0, -9.81])
     
     def force_liftdrag(self, state, action):
-        ## TODO: Implement aerodynamic force model here
-        return np.array([0.0, 0.0])
+        # total velocity from horizontal and vertical component
+        v_total = np.sqrt(state[2]**2 + state[3]**2)
+
+        # compute angle of attack = pitch angle - flight path angle
+        gamma = np.arctan2(state[3], state[2])
+        alpha = state[4] - gamma
+
+        # compute lift and drag coefficients
+        cl = self.cl0 + self.clalpha * alpha + self.cldelta * action
+        cd = self.cd0 + cl**2 / (np.pi * np.e * self.ar)
+
+        # compute lift and drag forces
+        lift = 0.5 * self.rho * v_total**2 * self.Sref * cl
+        drag = 0.5 * self.rho * v_total**2 * self.Sref * cd
+
+        # compute forces in x and z direction in earth fixed NED frame
+        # signs are chosen keeping in mind that the flight path angle is negative in gliding flight
+        fx = - lift * np.sin(gamma) - drag * np.cos(gamma)
+        fz = - lift * np.cos(gamma) + drag * np.sin(gamma)
+
+        return np.array([fx, - fz])
 
     def force_thrust(self, state, action):
         return np.array([0.0, 0.0])
 
     def moment_liftdrag(self, state, action):
-        ## TODO: Implement aerodynamic moment model here
-        return np.array([0.0])
+        # total velocity from horizontal and vertical component
+        v_total = np.sqrt(state[2]**2 + state[3]**2)
+
+        # compute moment coefficient
+        cm = self.cm0 + self.cmalpha * state[4] + self.cmdelta * action[1] + \
+            (state[5] * self.chord / (2 * v_total)) * self.cmq
+
+        # compute moment
+        moment = 0.5 * self.rho * v_total**2 * self.Sref * self.chord * cm
+
+        return np.array([moment])
 
     def step(self, action: np.ndarray):
-        position = self.state[0:2] # Position
-        velocity = self.state[2:4] #
+        position = self.state[0:2] # position
+        velocity = self.state[2:4] # velocity
 
         acceleration = (1/self.mass) * self.force_liftdrag(self.state, action[1]) \
             + (1/self.mass) * self.force_thrust(self.state, action[0]) \
@@ -181,7 +229,7 @@ class FWLongitudinal(gym.Env):
 
         pitch = pitch + pitch_rate * self.dt
         moment = self.moment_liftdrag(self.state, action)
-        pitch_rate = pitch_rate + moment* self.dt
+        pitch_rate = pitch_rate + (moment / self.Iyy) * self.dt
 
         # Convert a possible numpy bool to a Python bool.
         terminated = bool(
@@ -205,7 +253,7 @@ class FWLongitudinal(gym.Env):
         low, high = utils.maybe_parse_reset_bounds(options, -0.6, -0.4)
         self.state = np.array([0.0, 0, self.np_random.uniform(low=10.0, high=20.0), 
             self.np_random.uniform(low=0.0, high=5.0), 
-            self.np_random.uniform(low=-0.5, high=0.5), 
+            self.np_random.uniform(low=-0.2, high=0.3), 
             self.np_random.uniform(low=-0.1, high=0.1)])
 
         if self.render_mode == "human":
