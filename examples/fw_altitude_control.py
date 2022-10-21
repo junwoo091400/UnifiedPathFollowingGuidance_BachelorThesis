@@ -43,6 +43,8 @@ import csv
 # internal modules
 import windywings
 from timeit import default_timer as timer
+from windywings.logger.default_logger import Logger
+from matplotlib import pyplot as plt
 
 class Environments(unittest.TestCase):
 	def test_env(self):
@@ -50,28 +52,27 @@ class Environments(unittest.TestCase):
 		env.reset()
 		start_t=timer()
 
-		logger = self.initializeLogger(env, 'data.csv')
+		logger = Logger('results/data.csv')
 
 		for i,_ in enumerate(range(400)): #dt=0.03, 400*0.03=12s
-			# action = env.control()
 			action = [0.0, 0.0]
 			_, reward, done, _, accelerations = env.step(action)
 			env.render()
 
-			self.logData(env, logger, action, accelerations, i * env.dt)
+			logger.log_data(env, action, accelerations, i * env.dt)
 
 			if(done):
 				env.reset()
 		end_t=timer()
 		print("simulation time=",end_t-start_t)
-		# env.plot_state()
+
 
 	def ramp_input(self, control, start_value, transition_step, end_value, fixed_value, logfile, steps = 500):
 		env = gym.make('fixedwing-longitudinal')  # render_mode = 'human'
-		env.reset()
+		env.reset(seed = 22)
 		start_t=timer()
 
-		logger = self.initializeLogger(env, logfile)
+		logger = Logger(logfile)
 
 		for i,_ in enumerate(range(steps)):
 			action = env.control(control, start_value, transition_step, end_value, steps, fixed_value, i)
@@ -79,58 +80,20 @@ class Environments(unittest.TestCase):
 			_, reward, done, _, accelerations = env.step(action)
 			env.render()
 
-			self.logData(env, logger, action, accelerations, i * env.dt)
+			# only include steady state data in the log for system identification
+			if (i >= transition_step):
+				logger.log_data(env, action, accelerations, i * env.dt)
 
 			if(done):
 				env.reset()
 
 		end_t=timer()
 		print("simulation time=",end_t-start_t)
-	
-
-	def initializeLogger(self, env, log_path):
-		"""
-		Logging file for inputs and measurements according to data-driven-dynamics naming scheme;
-		All quantities that are not mentioned are assumed to be zero
-
-		| Variable name | Quantity                         		 | Min  | Max | Unit           |
-		|---------------|----------------------------------------|------|-----|----------------|
-		| U4   			| throttle input  						 | -1 	| 1   | position (m)   |
-		| U7   			| elevator input    					 | -1 	| 1   | position (m)   |
-		| Vx   			| horizontal velocity of the plane    	 | -Inf | Inf | velocity (m/s) |
-		| Vz   			| vertical   velocity of the plane    	 | -Inf | Inf | velocity (m/s) |
-		| Gamma   		| pitch of the plane                  	 | -PI  | PI  | rad            |
-		| Ang_vel_y   	| pitch rate of the plane              	 | -Inf | Inf | rad/s          |
-		| Acc_b_x  	 	| horizontal acceleration in body frame  | -Inf | Inf | m/s^2          |
-		| Acc_b_z   	| vertical acceleration in body frame    | -Inf | Inf | m/s^2          |
-		| Acc_ang_b_y   | angular acceleration in body frame     | -Inf | Inf | rad/s^2        |
-		"""
-
-		logfile = open(log_path, 'w')
-		logger = csv.writer(logfile, delimiter=',')
-		logger.writerow(['timestamp', 'U4', 'U7', 'Vx', 'Vz', 'Gamma', 'Ang_vel_y', 'Acc_b_x', 'Acc_b_z', 'Ang_acc_b_y'])
-
-		return logger
-
-
-	def logData(self, env, logger, action, accelerations, time):
-		acc_w_x = accelerations['linX']
-		acc_w_z = accelerations['linZ']
-		gamma = env.state[4]
-
-		# multiply the accelerations with the transormation matrix to body frame
-		# (rotation by gamma in mathematical positive direction around y)
-		acc_b_x = acc_w_x * np.cos(gamma) - acc_w_z * np.sin(gamma)
-		acc_b_z = acc_w_x * np.sin(gamma) + acc_w_z * np.cos(gamma)
-		acc_ang_b_y = accelerations['angY']
-
-		logger.writerow([time, action[0], action[1], env.state[2], - env.state[3], env.state[4], \
-			env.state[5], acc_b_x, acc_b_z, acc_ang_b_y])
-
 
 
 if __name__ == "__main__":
-	env=Environments()
+	env = Environments()
+
 	# env.test_env()
 	env.ramp_input('ramp_elevator', -1.0, 200, 1.0, 0.0, 'results/elevator_ramp_zero_thrust.csv', 2000)
 	env.ramp_input('ramp_elevator', -1.0, 200, 1.0, 1.0, 'results/elevator_ramp_full_thrust.csv', 2000)
