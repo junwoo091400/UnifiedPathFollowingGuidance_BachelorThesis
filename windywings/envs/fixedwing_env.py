@@ -118,12 +118,12 @@ class FWLongitudinal(gym.Env):
     }
 
     def __init__(self, render_mode: Optional[str] = None, goal_velocity=0):
-        # TODO: adapt these values to get more realistic results
+        # TODO: adapt these values according to vehicle properties
         self.mass = 20.0     # Mass of the vehicle
-        self.gravity = 9.81 # Gravity
-        self.chord = 0.5    # Chord length
-        self.span = 4.0     # Span length
-        self.rho = 1.225    # Air density
+        self.gravity = 9.81  # Gravity
+        self.chord = 0.5     # Chord length
+        self.span = 4.0      # Span length
+        self.rho = 1.225     # Air density
         self.Iyy = 20.0      # Moment of inertia
         self.Sref = self.chord * self.span  # Reference area
         self.ar = self.span**2 / self.Sref  # Aspect ratio
@@ -131,13 +131,13 @@ class FWLongitudinal(gym.Env):
         # TODO: determine these values through system identification
         self.cm0 = 0.01           # Moment coefficient at zero angle of attack
         self.cmalpha = -0.487     # Moment coefficient slope
-        self.cmdelta = -0.2     # Moment coefficient slope with elevator deflection
+        self.cmdelta = -0.2       # Moment coefficient slope with elevator deflection
         self.cmq = -13.8          # Moment damping coefficient
         self.cl0 = 0.2            # Lift coefficient at zero angle of attack
         self.clalpha = 2 * np.pi  # Lift coefficient slope (ideally 2*pi)
         self.cldelta = 0.1        # Lift coefficient slope with elevator deflection
         self.cd0 = 0.03           # Drag coefficient at zero angle of attack
-        self.cf = 50000          # Thrust coefficient
+        self.cf = 50000           # Thrust coefficient
 
         self.dt = 0.03
         self.min_action = -1.0
@@ -174,7 +174,8 @@ class FWLongitudinal(gym.Env):
             low=self.low_state, high=self.high_state, dtype=np.float32
         )
         self.gravity = np.array([0.0, -9.81])
-    
+
+
     def force_liftdrag(self, state, action):
         # total velocity from horizontal and vertical component
         v_total = np.sqrt(state[2]**2 + state[3]**2)
@@ -198,13 +199,19 @@ class FWLongitudinal(gym.Env):
 
         return np.array([fx, - fz])
 
+
     def force_thrust(self, state, action):
         gamma = np.arctan2(state[3], state[2])
 
         # compute thrust force
         thrust = self.power * action * self.cf
 
-        return np.array([thrust * np.cos(gamma), thrust * np.sin(gamma)])
+        # split the force into x and z components in earth fixed NED frame
+        thrustX = thrust * np.cos(gamma)
+        thrustZ = - thrust * np.sin(gamma)
+
+        return np.array([thrustX, - thrustZ])
+
 
     def moment_liftdrag(self, state, action):
         # total velocity from horizontal and vertical component
@@ -217,7 +224,8 @@ class FWLongitudinal(gym.Env):
         # compute moment
         moment = 0.5 * self.rho * v_total**2 * self.Sref * self.chord * cm
 
-        return np.array([moment])
+        return moment
+
 
     def step(self, action: np.ndarray):
         position = self.state[0:2] # position
@@ -250,7 +258,9 @@ class FWLongitudinal(gym.Env):
 
         if self.render_mode == "human":
             self.render()
-        return self.state, reward, terminated, False, {}
+        return self.state, reward, terminated, False, { 'linX': acceleration[0], \
+            'linZ': - acceleration[1], 'angY': moment / self.Iyy }
+
 
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
         super().reset(seed=seed)
@@ -266,8 +276,10 @@ class FWLongitudinal(gym.Env):
             self.render()
         return np.array(self.state, dtype=np.float32), {}
 
+
     def _height(self, xs):
         return 0.0 * xs
+
 
     def render(self):
         if self.render_mode is None:
@@ -337,6 +349,7 @@ class FWLongitudinal(gym.Env):
             return np.transpose(
                 np.array(pygame.surfarray.pixels3d(self.screen)), axes=(1, 0, 2)
             )
+
 
     def close(self):
         if self.screen is not None:
