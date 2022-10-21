@@ -38,7 +38,6 @@ import unittest
 # 3rd party modules
 import gym
 import numpy as np
-import logging
 import csv
 
 # internal modules
@@ -66,12 +65,33 @@ class Environments(unittest.TestCase):
 		end_t=timer()
 		print("simulation time=",end_t-start_t)
 		# env.plot_state()
+
+	def ramp_input(self, control, start_value, transition_step, end_value, fixed_value, logfile, steps = 500):
+		env = gym.make('fixedwing-longitudinal')  # render_mode = 'human'
+		env.reset()
+		start_t=timer()
+
+		logger = self.initializeLogger(env, logfile)
+
+		for i,_ in enumerate(range(steps)):
+			action = env.control(control, start_value, transition_step, end_value, steps, fixed_value, i)
+
+			_, reward, done, _, accelerations = env.step(action)
+			env.render()
+
+			self.logData(env, logger, action, accelerations, i * env.dt)
+
+			if(done):
+				env.reset()
+
+		end_t=timer()
+		print("simulation time=",end_t-start_t)
 	
 
 	def initializeLogger(self, env, log_path):
 		"""
-		logging file for inputs and measurements according to data-driven-dynamics naming;
-		all remaining quantities are assumed to be zero
+		Logging file for inputs and measurements according to data-driven-dynamics naming scheme;
+		All quantities that are not mentioned are assumed to be zero
 
 		| Variable name | Quantity                         		 | Min  | Max | Unit           |
 		|---------------|----------------------------------------|------|-----|----------------|
@@ -111,4 +131,8 @@ class Environments(unittest.TestCase):
 
 if __name__ == "__main__":
 	env=Environments()
-	env.test_env()
+	# env.test_env()
+	env.ramp_input('ramp_elevator', -1.0, 200, 1.0, 0.0, 'results/elevator_ramp_zero_thrust.csv', 2000)
+	env.ramp_input('ramp_elevator', -1.0, 200, 1.0, 1.0, 'results/elevator_ramp_full_thrust.csv', 2000)
+	env.ramp_input('ramp_throttle', 0.0, 200, 1.0, 0.0, 'results/throttle_ramp_slow.csv', 2000)
+	env.ramp_input('ramp_throttle', 0.0, 100, 1.0, 0.0, 'results/throttle_ramp_fast.csv', 700)

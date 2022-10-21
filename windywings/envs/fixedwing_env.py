@@ -72,8 +72,8 @@ class FWLongitudinal(gym.Env):
 
     | Num | Action                               | Min  | Max | Unit           |
     |-----|--------------------------------------|------|-----|----------------|
-    | 0   | throttle of the plane                | -1   | 1   | position (m)   |
-    | 1   | elevator position of the plane       | -1   | 1   | position (m)   |
+    | 0   | throttle of the plane                | 0    | 1   | setting        |
+    | 1   | elevator position of the plane       | -1   | 1   | setting        |
 
     ### Transition Dynamics:
 
@@ -350,6 +350,25 @@ class FWLongitudinal(gym.Env):
                 np.array(pygame.surfarray.pixels3d(self.screen)), axes=(1, 0, 2)
             )
 
+
+    def control(self, control = 'ramp_elevator', start_value = -1.0, transition_step = 200, \
+        end_value = 1.0, steps = 800, fixed_value = 0.0, iteration = 0):
+
+        if control == 'ramp_elevator':
+            if iteration < transition_step:
+                return np.array([fixed_value, start_value])
+            else:
+                return np.array([fixed_value, (iteration - transition_step) / (steps - transition_step) * \
+                    (end_value - start_value) + start_value])
+        
+        if control == 'ramp_thrust':
+            if iteration < transition_step:
+                return np.array([start_value, fixed_value])
+            else:
+                return np.array([(iteration - transition_step) / (steps - transition_step) * \
+                    (end_value - start_value) + start_value, fixed_value])
+
+        return np.array([0.0, 0.0])
 
     def close(self):
         if self.screen is not None:
