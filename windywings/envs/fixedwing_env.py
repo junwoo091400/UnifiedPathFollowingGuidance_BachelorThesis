@@ -131,12 +131,13 @@ class FWLongitudinal(gym.Env):
         # TODO: determine these values through system identification
         self.cm0 = 0.01           # Moment coefficient at zero angle of attack
         self.cmalpha = -0.487     # Moment coefficient slope
-        self.cmdelta = -0.015     # Moment coefficient slope with elevator deflection
+        self.cmdelta = -0.2     # Moment coefficient slope with elevator deflection
         self.cmq = -13.8          # Moment damping coefficient
         self.cl0 = 0.2            # Lift coefficient at zero angle of attack
         self.clalpha = 2 * np.pi  # Lift coefficient slope (ideally 2*pi)
         self.cldelta = 0.1        # Lift coefficient slope with elevator deflection
         self.cd0 = 0.03           # Drag coefficient at zero angle of attack
+        self.cf = 50000          # Thrust coefficient
 
         self.dt = 0.03
         self.min_action = -1.0
@@ -160,8 +161,8 @@ class FWLongitudinal(gym.Env):
 
         self.render_mode = render_mode
 
-        self.screen_width = 600
-        self.screen_height = 400
+        self.screen_width = 1000
+        self.screen_height = 600
         self.screen = None
         self.clock = None
         self.isopen = True
@@ -198,7 +199,12 @@ class FWLongitudinal(gym.Env):
         return np.array([fx, - fz])
 
     def force_thrust(self, state, action):
-        return np.array([0.0, 0.0])
+        gamma = np.arctan2(state[3], state[2])
+
+        # compute thrust force
+        thrust = self.power * action * self.cf
+
+        return np.array([thrust * np.cos(gamma), thrust * np.sin(gamma)])
 
     def moment_liftdrag(self, state, action):
         # total velocity from horizontal and vertical component
