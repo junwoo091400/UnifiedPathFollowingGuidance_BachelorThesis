@@ -189,8 +189,22 @@ class FWLongitudinal(gym.Env):
         gamma = np.arctan2(state[3], state[2])
         alpha = state[4] - gamma
 
-        # compute lift and drag coefficients
-        cl = self.cl0 + self.clalpha * alpha + self.cldelta * action
+        # compute lift coefficient
+        # TODO: decide whether to use the linear or more complex approach to model lift characteristics
+        # cl = self.cl0 + self.clalpha * alpha + self.cldelta * action
+        # non-linear approach including simple stall model
+        if (alpha < self.alpha_stall - 5.0 / 180.0 * np.pi).all():
+            cl = self.cl0 + self.clalpha * \
+                alpha + self.cldelta * action
+        elif (alpha > self.alpha_stall - 5.0 / 180.0 * np.pi and alpha < self.alpha_stall + 5.0 / 180.0 * np.pi).all():
+            # sample a sigmoid functino for the transition, assuming 10 degrees width for the transition
+            sigmoid_sample = self.sample_sigmoid(self.alpha_stall, 10.0 / 180.0 * np.pi, alpha)
+            cl = (self.cl0 + self.clalpha * alpha + self.cldelta * action) * \
+                (1 - sigmoid_sample) + self.cl_stall * sigmoid_sample
+        else:
+            cl = self.cl_stall
+
+        # compute drag coefficient
         cd = self.cd0 + cl**2 / (np.pi * np.e * self.ar)
 
         # compute lift and drag forces

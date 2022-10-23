@@ -65,7 +65,7 @@ class Environments(unittest.TestCase):
         print("simulation time=", end_t-start_t)
 
     def ramp_input(self, control, start_value, transition_step, end_value, fixed_value, logfile, steps=500):
-        env = gym.make('fixedwing-longitudinal')  # render_mode = 'human'
+        env = gym.make('fixedwing-longitudinal', render_mode = 'human')  # render_mode = 'human'
         env.reset(seed=22)
         start_t = timer()
 
