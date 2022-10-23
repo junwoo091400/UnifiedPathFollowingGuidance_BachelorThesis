@@ -41,61 +41,68 @@ import numpy as np
 import csv
 
 # internal modules
-import windywings
 from timeit import default_timer as timer
 from windywings.logger.default_logger import Logger
-from matplotlib import pyplot as plt
+from windywings.envs.fixedwing_env import FWLongitudinal
+
 
 class Environments(unittest.TestCase):
-	def test_env(self):
-		env = gym.make('fixedwing-longitudinal', render_mode='human')
-		env.reset()
-		start_t=timer()
+    def test_env(self):
+        env = gym.make('fixedwing-longitudinal', render_mode='human')
+        env.reset()
+        start_t = timer()
 
-		logger = Logger('results/data.csv')
+        logger = Logger('results/data.csv')
 
-		for i,_ in enumerate(range(400)): #dt=0.03, 400*0.03=12s
-			action = [0.0, 0.0]
-			_, reward, done, _, accelerations = env.step(action)
-			env.render()
+        for i, _ in enumerate(range(400)):  # dt=0.03, 400*0.03=12s
+            action = [0.0, 0.0]
+            _, reward, done, _, accelerations = env.step(action)
+            env.render()
 
-			logger.log_data(env, action, accelerations, i * env.dt)
+            logger.log_data(env, action, accelerations, i * env.dt)
 
-			if(done):
-				env.reset()
-		end_t=timer()
-		print("simulation time=",end_t-start_t)
+            if (done):
+                env.reset()
+        end_t = timer()
+        print("simulation time=", end_t-start_t)
 
+    def ramp_input(self, control, start_value, transition_step, end_value, fixed_value, logfile, steps=500):
+        env = gym.make('fixedwing-longitudinal')  # render_mode = 'human'
+        env.reset(seed=22)
+        start_t = timer()
 
-	def ramp_input(self, control, start_value, transition_step, end_value, fixed_value, logfile, steps = 500):
-		env = gym.make('fixedwing-longitudinal')  # render_mode = 'human'
-		env.reset(seed = 22)
-		start_t=timer()
+        logger = Logger(logfile)
 
-		logger = Logger(logfile)
+        for i, _ in enumerate(range(steps)):
+            action = env.control(
+                control, start_value, transition_step, end_value, steps, fixed_value, i)
 
-		for i,_ in enumerate(range(steps)):
-			action = env.control(control, start_value, transition_step, end_value, steps, fixed_value, i)
+            _, reward, done, _, accelerations = env.step(action)
+            env.render()
 
-			_, reward, done, _, accelerations = env.step(action)
-			env.render()
+            # only include steady state data in the log for system identification
+            if (i >= transition_step):
+                logger.log_data(env, action, accelerations, i * env.dt)
 
-			# only include steady state data in the log for system identification
-			if (i >= transition_step):
-				logger.log_data(env, action, accelerations, i * env.dt)
+            if (done):
+                env.reset()
 
-			if(done):
-				env.reset()
-
-		end_t=timer()
-		print("simulation time=",end_t-start_t)
+        end_t = timer()
+        print("simulation time=", end_t-start_t)
 
 
 if __name__ == "__main__":
-	env = Environments()
+    env = Environments()
 
-	# env.test_env()
-	env.ramp_input('ramp_elevator', -1.0, 200, 1.0, 0.0, 'results/elevator_ramp_zero_thrust.csv', 2000)
-	env.ramp_input('ramp_elevator', -1.0, 200, 1.0, 1.0, 'results/elevator_ramp_full_thrust.csv', 2000)
-	env.ramp_input('ramp_throttle', 0.0, 200, 1.0, 0.0, 'results/throttle_ramp_slow.csv', 2000)
-	env.ramp_input('ramp_throttle', 0.0, 100, 1.0, 0.0, 'results/throttle_ramp_fast.csv', 700)
+    # env.test_env()
+    env.ramp_input('ramp_elevator', -1.0, 200, 1.0, 0.0,
+                   'results/elevator_ramp_zero_thrust.csv', 2000)
+    env.ramp_input('ramp_elevator', -1.0, 200, 1.0, 1.0,
+                   'results/elevator_ramp_full_thrust.csv', 2000)
+    env.ramp_input('ramp_throttle', 0.0, 200, 1.0, 0.0,
+                   'results/throttle_ramp_slow.csv', 2000)
+    env.ramp_input('ramp_throttle', 0.0, 100, 1.0, 0.0,
+                   'results/throttle_ramp_fast.csv', 700)
+
+    FWLongitudinal.visualize_results(paths=['results/elevator_ramp_zero_thrust.csv', 'results/elevator_ramp_full_thrust.csv'],
+                                     variablesX=['Vx', 'Vx'], variablesY=['Vz', 'Vz'], invertedY=[True, True])

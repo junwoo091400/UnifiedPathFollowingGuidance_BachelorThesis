@@ -45,6 +45,9 @@ from gym import spaces
 from gym.envs.classic_control import utils
 from gym.error import DependencyNotInstalled
 
+from windywings.logger.default_logger import Logger
+from matplotlib import pyplot as plt
+
 
 class FWLongitudinal(gym.Env):
     """
@@ -225,6 +228,18 @@ class FWLongitudinal(gym.Env):
         moment = 0.5 * self.rho * v_total**2 * self.Sref * self.chord * cm
 
         return moment
+
+
+    def visualize_results(paths, variablesX, variablesY, invertedY = False):
+        for idx, path in enumerate(paths):
+            data = Logger.get_data(path)
+            plt.figure(idx + 1)
+            plt.plot(data[variablesX[idx]], data[variablesY[idx]])
+        
+            if invertedY:
+                plt.gca().invert_yaxis()
+
+        plt.show()
 
 
     def step(self, action: np.ndarray):
