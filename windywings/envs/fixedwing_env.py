@@ -34,9 +34,10 @@
 #
 ############################################################################
 
+from cProfile import label
 import math
 from typing import Optional
-from matplotlib import cm
+import math
 
 import numpy as np
 
@@ -138,9 +139,11 @@ class FWLongitudinal(gym.Env):
         self.cmq = -13.8          # Moment damping coefficient
         self.cl0 = 0.2            # Lift coefficient at zero angle of attack
         self.clalpha = 2 * np.pi  # Lift coefficient slope (ideally 2*pi)
+        self.cl_stall = 0.7       # Lift coefficient at stall
         self.cldelta = 0.1        # Lift coefficient slope with elevator deflection
         self.cd0 = 0.03           # Drag coefficient at zero angle of attack
         self.cf = 50000           # Thrust coefficient
+        self.alpha_stall = round(20 / 180.0 * np.pi,3)     # Angle of attack at stall
 
         self.dt = 0.03
         self.min_action = -1.0
@@ -178,7 +181,6 @@ class FWLongitudinal(gym.Env):
         )
         self.gravity = np.array([0.0, -9.81])
 
-
     def force_liftdrag(self, state, action):
         # total velocity from horizontal and vertical component
         v_total = np.sqrt(state[2]**2 + state[3]**2)
@@ -202,6 +204,49 @@ class FWLongitudinal(gym.Env):
 
         return np.array([fx, - fz])
 
+    def demo_plot_cl_alpha(self):
+        # set these parameters to change the cl vs alpha plot
+        steps = 900
+        alpha_min_deg = -30.0
+        alpha_max_deg = 40.0
+
+        alphas = np.linspace(alpha_min_deg / 180.0 * np.pi,
+                            alpha_max_deg / 180.0 * np.pi, steps)
+        action = np.linspace(1.0, -1.0, steps)
+
+        cl = np.linspace(0.0, 0.0, 900)
+        for idx, alpha in enumerate(alphas):
+            if (alpha < self.alpha_stall - 5.0 / 180.0 * np.pi).all():
+                cl[idx] = self.cl0 + self.clalpha * \
+                    alpha + self.cldelta * action[idx]
+            elif (alpha > self.alpha_stall - 5.0 / 180.0 * np.pi and alpha < self.alpha_stall + 5.0 / 180.0 * np.pi).all():
+                sigmoid_sample = self.sample_sigmoid(self.alpha_stall, 10.0 / 180.0 * np.pi, alpha)
+                cl[idx] = (self.cl0 + self.clalpha * alpha + self.cldelta * action[idx]) * \
+                    (1 - sigmoid_sample) + self.cl_stall * sigmoid_sample
+            else:
+                cl[idx] = self.cl_stall
+
+        plt.figure('Demo non-linear AoA vs CL')
+        plt.plot(alphas, cl)
+        plt.xlabel(r'Angle of attack $\alpha$ [rad]')
+        plt.ylabel(r'Lift coefficient $c_L$')
+        plt.show()
+
+    def sample_sigmoid(self, center: float, width: float, sample: float):
+        # rounding is required for consistent array lengths, trade-off between accuracy and computation speed
+        # rounding the values to 3 decimals still results in reasonable accuracy
+        rounded_width = round(width, 4)
+        rounded_sample = round(sample, 4)
+        rounded_center = round(center, 4)
+
+        # compute the index of the sample in the discretized sigmoid function
+        idx = int(round((rounded_sample - rounded_center + rounded_width / 2) * 10000, 0))
+
+        # compute the argument of the sigmoid function assuming a clipped version in [-6.0, 6.0]
+        sigmoid_arg = idx / (math.ceil(rounded_width / 0.0001) + 1) * 12.0 - 6.0
+
+        # return the value of the scaled sigmoid function
+        return 1.0 / (1.0 + np.exp(- sigmoid_arg))
 
     def force_thrust(self, state, action):
         gamma = np.arctan2(state[3], state[2])
@@ -214,7 +259,6 @@ class FWLongitudinal(gym.Env):
         thrustZ = - thrust * np.sin(gamma)
 
         return np.array([thrustX, - thrustZ])
-
 
     def moment_liftdrag(self, state, action):
         # total velocity from horizontal and vertical component
@@ -229,22 +273,22 @@ class FWLongitudinal(gym.Env):
 
         return moment
 
-
-    def visualize_results(paths, variablesX, variablesY, invertedY = False):
+    def visualize_results(paths, variablesX, variablesY, invertedY=False):
         for idx, path in enumerate(paths):
             data = Logger.get_data(path)
             plt.figure(idx + 1)
             plt.plot(data[variablesX[idx]], data[variablesY[idx]])
-        
+            plt.xlabel(variablesX[idx])
+            plt.ylabel(variablesY[idx])
+
             if invertedY:
                 plt.gca().invert_yaxis()
 
         plt.show()
 
-
     def step(self, action: np.ndarray):
-        position = self.state[0:2] # position
-        velocity = self.state[2:4] # velocity
+        position = self.state[0:2]  # position
+        velocity = self.state[2:4]  # velocity
 
         acceleration = (1/self.mass) * self.force_liftdrag(self.state, action[1]) \
             + (1/self.mass) * self.force_thrust(self.state, action[0]) \
@@ -269,32 +313,30 @@ class FWLongitudinal(gym.Env):
         if terminated:
             reward = 0.0
         reward -= math.pow(action[0], 2) * 0.1
-        self.state = np.array([position[0], position[1], velocity[0], velocity[1], pitch, pitch_rate], dtype=np.float32)
+        self.state = np.array([position[0], position[1], velocity[0],
+                              velocity[1], pitch, pitch_rate], dtype=np.float32)
 
         if self.render_mode == "human":
             self.render()
-        return self.state, reward, terminated, False, { 'linX': acceleration[0], \
-            'linZ': - acceleration[1], 'angY': moment / self.Iyy }
-
+        return self.state, reward, terminated, False, {'linX': acceleration[0],
+                                                       'linZ': - acceleration[1], 'angY': moment / self.Iyy}
 
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
         super().reset(seed=seed)
         # Note that if you use custom reset bounds, it may lead to out-of-bound
         # state/observations.
         low, high = utils.maybe_parse_reset_bounds(options, -0.6, -0.4)
-        self.state = np.array([0.0, 0, self.np_random.uniform(low=10.0, high=20.0), 
-            self.np_random.uniform(low=0.0, high=5.0), 
-            self.np_random.uniform(low=-0.2, high=0.3), 
-            self.np_random.uniform(low=-0.1, high=0.1)])
+        self.state = np.array([0.0, 0, self.np_random.uniform(low=10.0, high=20.0),
+                               self.np_random.uniform(low=0.0, high=5.0),
+                               self.np_random.uniform(low=-0.2, high=0.3),
+                               self.np_random.uniform(low=-0.1, high=0.1)])
 
         if self.render_mode == "human":
             self.render()
         return np.array(self.state, dtype=np.float32), {}
 
-
     def _height(self, xs):
         return 0.0 * xs
-
 
     def render(self):
         if self.render_mode is None:
@@ -322,7 +364,8 @@ class FWLongitudinal(gym.Env):
                     (self.screen_width, self.screen_height)
                 )
             else:  # mode == "rgb_array":
-                self.screen = pygame.Surface((self.screen_width, self.screen_height))
+                self.screen = pygame.Surface(
+                    (self.screen_width, self.screen_height))
         if self.clock is None:
             self.clock = pygame.time.Clock()
 
@@ -365,23 +408,22 @@ class FWLongitudinal(gym.Env):
                 np.array(pygame.surfarray.pixels3d(self.screen)), axes=(1, 0, 2)
             )
 
-
-    def control(self, control = 'ramp_elevator', start_value = -1.0, transition_step = 200, \
-        end_value = 1.0, steps = 800, fixed_value = 0.0, iteration = 0):
+    def control(self, control='ramp_elevator', start_value=-1.0, transition_step=200,
+                end_value=1.0, steps=800, fixed_value=0.0, iteration=0):
 
         if control == 'ramp_elevator':
             if iteration < transition_step:
                 return np.array([fixed_value, start_value])
             else:
-                return np.array([fixed_value, (iteration - transition_step) / (steps - transition_step) * \
-                    (end_value - start_value) + start_value])
-        
+                return np.array([fixed_value, (iteration - transition_step) / (steps - transition_step) *
+                                 (end_value - start_value) + start_value])
+
         if control == 'ramp_thrust':
             if iteration < transition_step:
                 return np.array([start_value, fixed_value])
             else:
-                return np.array([(iteration - transition_step) / (steps - transition_step) * \
-                    (end_value - start_value) + start_value, fixed_value])
+                return np.array([(iteration - transition_step) / (steps - transition_step) *
+                                 (end_value - start_value) + start_value, fixed_value])
 
         return np.array([0.0, 0.0])
 

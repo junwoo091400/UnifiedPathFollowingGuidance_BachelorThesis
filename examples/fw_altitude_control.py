@@ -37,8 +37,6 @@ import unittest
 
 # 3rd party modules
 import gym
-import numpy as np
-import csv
 
 # internal modules
 from timeit import default_timer as timer
@@ -103,6 +101,11 @@ if __name__ == "__main__":
                    'results/throttle_ramp_slow.csv', 2000)
     env.ramp_input('ramp_throttle', 0.0, 100, 1.0, 0.0,
                    'results/throttle_ramp_fast.csv', 700)
+
+    fixedwing_env = FWLongitudinal()
+
+    # TODO: remove function call and function
+    fixedwing_env.demo_plot_cl_alpha()
 
     FWLongitudinal.visualize_results(paths=['results/elevator_ramp_zero_thrust.csv', 'results/elevator_ramp_full_thrust.csv'],
                                      variablesX=['Vx', 'Vx'], variablesY=['Vz', 'Vz'], invertedY=[True, True])
