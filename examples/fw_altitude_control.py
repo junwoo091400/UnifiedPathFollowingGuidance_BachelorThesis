@@ -65,7 +65,7 @@ class Environments(unittest.TestCase):
         print("simulation time=", end_t-start_t)
 
     def ramp_input(self, control, start_value, transition_step, end_value, fixed_value, logfile, steps=500):
-        env = gym.make('fixedwing-longitudinal', render_mode = 'human')  # render_mode = 'human'
+        env = gym.make('fixedwing-longitudinal')  # render_mode = 'human'
         env.reset(seed=22)
         start_t = timer()
 
@@ -93,10 +93,10 @@ if __name__ == "__main__":
     env = Environments()
 
     # env.test_env()
-    env.ramp_input('ramp_elevator', -1.0, 200, 1.0, 0.0,
-                   'results/elevator_ramp_zero_thrust.csv', 2000)
-    env.ramp_input('ramp_elevator', -1.0, 200, 1.0, 1.0,
-                   'results/elevator_ramp_full_thrust.csv', 2000)
+    env.ramp_input('ramp_elevator', -1.0, 1000, 1.0, 0.0,
+                   'results/elevator_ramp_zero_thrust.csv', 3000)
+    env.ramp_input('ramp_elevator', -1.0, 1000, 1.0, 1.0,
+                   'results/elevator_ramp_full_thrust.csv', 3000)
     env.ramp_input('ramp_throttle', 0.0, 200, 1.0, 0.0,
                    'results/throttle_ramp_slow.csv', 2000)
     env.ramp_input('ramp_throttle', 0.0, 100, 1.0, 0.0,
@@ -104,8 +104,24 @@ if __name__ == "__main__":
 
     fixedwing_env = FWLongitudinal()
 
-    # TODO: remove function call and function
-    fixedwing_env.demo_plot_cl_alpha()
+    # illustrate the non-linear lift model with sigmoid fusion
+    fixedwing_env.demo_sigmoid_nonlinear_cl_model()
 
-    FWLongitudinal.visualize_results(paths=['results/elevator_ramp_zero_thrust.csv', 'results/elevator_ramp_full_thrust.csv'],
-                                     variablesX=['Vx', 'Vx'], variablesY=['Vz', 'Vz'], invertedY=[True, True])
+    # visualize the flight data from the log file in a V vs Vz plot (to identify min sink speed)
+    FWLongitudinal.visualize_results(plots=[{'path': 'results/elevator_ramp_zero_thrust.csv', 'name': 'Sink rate vs. velocity at zero thrust'},
+                                            {'path': 'results/elevator_ramp_full_thrust.csv', 'name': 'Sink rate vs. velocity at full thrust'}],
+                                     mode='V Vz')
+
+    # visualize the lift vs. drag values against the velocity in a plot for zero thrust data
+    FWLongitudinal.visualize_results(plots=[{'path': 'results/elevator_ramp_zero_thrust.csv', 'name': 'Lift-drag ratio vs. velocity at zero thrust'}],
+                                     mode='L/D V')
+
+    FWLongitudinal.visualize_results(
+        plots=[{'path': 'results/elevator_ramp_zero_thrust.csv', 'name': 'AoA over time for zero thrust'},
+               {'path': 'results/elevator_ramp_full_thrust.csv', 'name': 'AoA over time for full thrust'}],
+        mode='AoAs')
+
+    FWLongitudinal.visualize_results(
+        plots=[{'path': 'results/elevator_ramp_zero_thrust.csv', 'name': 'Pitch angle over time for zero thrust'},
+               {'path': 'results/elevator_ramp_full_thrust.csv', 'name': 'Pitch angle over time for full thrust'}],
+        mode='Gammas')

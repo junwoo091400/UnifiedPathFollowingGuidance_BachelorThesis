@@ -52,11 +52,11 @@ from matplotlib import pyplot as plt
 
 class FWLongitudinal(gym.Env):
     """
-    ### Description
+    # Description
 
     Environment to simulate fixed wing longitudinal dynamics
 
-    ### Observation Space
+    # Observation Space
 
     The observation is a `ndarray` with shape `(3,)` where the elements correspond to the following:
 
@@ -69,7 +69,7 @@ class FWLongitudinal(gym.Env):
     | 4   | pitch of the plane                   | -PI  | PI  | rad            |
     | 5   | pitch rate of the plane              | -Inf | Inf | rad/s          |
 
-    ### Action Space
+    # Action Space
 
     The action is a `ndarray` with shape `(2,)`, representing the aileron and throttle inputs.
     The action is clipped in the range `[-1,1]`
@@ -79,7 +79,7 @@ class FWLongitudinal(gym.Env):
     | 0   | throttle of the plane                | 0    | 1   | setting        |
     | 1   | elevator position of the plane       | -1   | 1   | setting        |
 
-    ### Transition Dynamics:
+    # Transition Dynamics:
 
     Given an action, the plane is following transition dynamics:
 
@@ -91,27 +91,27 @@ class FWLongitudinal(gym.Env):
     The collisions at either end are inelastic with the velocity set to 0 upon collision with the wall.
     The position is clipped to the range [-1.2, 0.6] and velocity is clipped to the range [-0.07, 0.07].
 
-    ### Reward
+    # Reward
 
 
-    ### Starting State
+    # Starting State
 
     The position of the plane is assigned a uniform random value in `[0.0. , 0.0]`.
     The starting velocity of the plane is always assigned to `[15.0. , 0.0]`.
 
-    ### Episode End
+    # Episode End
 
     The episode ends if either of the following happens:
     1. Termination: The position of the car is greater than or equal to 0.45 (the goal position on top of the right hill)
     2. Truncation: The length of the episode is 999.
 
-    ### Arguments
+    # Arguments
 
     ```
     gym.make('fixedwing-longituninal')
     ```
 
-    ### Version History
+    # Version History
 
     * v0: Initial versions release (1.0.0)
     """
@@ -143,7 +143,8 @@ class FWLongitudinal(gym.Env):
         self.cldelta = 0.1        # Lift coefficient slope with elevator deflection
         self.cd0 = 0.03           # Drag coefficient at zero angle of attack
         self.cf = 50000           # Thrust coefficient
-        self.alpha_stall = round(20 / 180.0 * np.pi,3)     # Angle of attack at stall
+        # Angle of attack at stall
+        self.alpha_stall = round(20 / 180.0 * np.pi, 3)
 
         self.dt = 0.03
         self.min_action = -1.0
@@ -190,19 +191,21 @@ class FWLongitudinal(gym.Env):
         alpha = state[4] - gamma
 
         # compute lift coefficient
-        # TODO: decide whether to use the linear or more complex approach to model lift characteristics
-        # cl = self.cl0 + self.clalpha * alpha + self.cldelta * action
-        # non-linear approach including simple stall model
-        if (alpha < self.alpha_stall - 5.0 / 180.0 * np.pi).all():
-            cl = self.cl0 + self.clalpha * \
-                alpha + self.cldelta * action
-        elif (alpha > self.alpha_stall - 5.0 / 180.0 * np.pi and alpha < self.alpha_stall + 5.0 / 180.0 * np.pi).all():
-            # sample a sigmoid functino for the transition, assuming 10 degrees width for the transition
-            sigmoid_sample = self.sample_sigmoid(self.alpha_stall, 10.0 / 180.0 * np.pi, alpha)
-            cl = (self.cl0 + self.clalpha * alpha + self.cldelta * action) * \
-                (1 - sigmoid_sample) + self.cl_stall * sigmoid_sample
-        else:
-            cl = self.cl_stall
+        # ! linear lift coefficient model
+        cl = self.cl0 + self.clalpha * alpha + self.cldelta * action
+
+        # ! non-linear approach using the sigmoid model for stall
+        # if (alpha < self.alpha_stall - 5.0 / 180.0 * np.pi).all():
+        #     cl = self.cl0 + self.clalpha * \
+        #         alpha + self.cldelta * action
+        # elif (alpha > self.alpha_stall - 5.0 / 180.0 * np.pi and alpha < self.alpha_stall + 5.0 / 180.0 * np.pi).all():
+        #     sigmoid_sample = self.sample_sigmoid(
+        #         self.alpha_stall, 10.0 / 180.0 * np.pi, alpha)
+        #     cl = (self.cl0 + self.clalpha * alpha + self.cldelta * action) * \
+        #         (1 - sigmoid_sample) + 2 * np.sin(alpha) * \
+        #         self.cl_stall * sigmoid_sample
+        # else:
+        #     cl = 2 * np.sin(alpha) * self.cl_stall
 
         # compute drag coefficient
         cd = self.cd0 + cl**2 / (np.pi * np.e * self.ar)
@@ -218,34 +221,6 @@ class FWLongitudinal(gym.Env):
 
         return np.array([fx, - fz])
 
-    def demo_plot_cl_alpha(self):
-        # set these parameters to change the cl vs alpha plot
-        steps = 900
-        alpha_min_deg = -30.0
-        alpha_max_deg = 40.0
-
-        alphas = np.linspace(alpha_min_deg / 180.0 * np.pi,
-                            alpha_max_deg / 180.0 * np.pi, steps)
-        action = np.linspace(1.0, -1.0, steps)
-
-        cl = np.linspace(0.0, 0.0, 900)
-        for idx, alpha in enumerate(alphas):
-            if (alpha < self.alpha_stall - 5.0 / 180.0 * np.pi).all():
-                cl[idx] = self.cl0 + self.clalpha * \
-                    alpha + self.cldelta * action[idx]
-            elif (alpha > self.alpha_stall - 5.0 / 180.0 * np.pi and alpha < self.alpha_stall + 5.0 / 180.0 * np.pi).all():
-                sigmoid_sample = self.sample_sigmoid(self.alpha_stall, 10.0 / 180.0 * np.pi, alpha)
-                cl[idx] = (self.cl0 + self.clalpha * alpha + self.cldelta * action[idx]) * \
-                    (1 - sigmoid_sample) + self.cl_stall * sigmoid_sample
-            else:
-                cl[idx] = self.cl_stall
-
-        plt.figure('Demo non-linear AoA vs CL')
-        plt.plot(alphas, cl)
-        plt.xlabel(r'Angle of attack $\alpha$ [rad]')
-        plt.ylabel(r'Lift coefficient $c_L$')
-        plt.show()
-
     def sample_sigmoid(self, center: float, width: float, sample: float):
         # rounding is required for consistent array lengths, trade-off between accuracy and computation speed
         # rounding the values to 3 decimals still results in reasonable accuracy
@@ -254,10 +229,12 @@ class FWLongitudinal(gym.Env):
         rounded_center = round(center, 4)
 
         # compute the index of the sample in the discretized sigmoid function
-        idx = int(round((rounded_sample - rounded_center + rounded_width / 2) * 10000, 0))
+        idx = int(
+            round((rounded_sample - rounded_center + rounded_width / 2) * 10000, 0))
 
         # compute the argument of the sigmoid function assuming a clipped version in [-6.0, 6.0]
-        sigmoid_arg = idx / (math.ceil(rounded_width / 0.0001) + 1) * 12.0 - 6.0
+        sigmoid_arg = idx / \
+            (math.ceil(rounded_width / 0.0001) + 1) * 12.0 - 6.0
 
         # return the value of the scaled sigmoid function
         return 1.0 / (1.0 + np.exp(- sigmoid_arg))
@@ -287,16 +264,58 @@ class FWLongitudinal(gym.Env):
 
         return moment
 
-    def visualize_results(paths, variablesX, variablesY, invertedY=False):
-        for idx, path in enumerate(paths):
-            data = Logger.get_data(path)
-            plt.figure(idx + 1)
-            plt.plot(data[variablesX[idx]], data[variablesY[idx]])
-            plt.xlabel(variablesX[idx])
-            plt.ylabel(variablesY[idx])
+    def visualize_results(plots, mode):
+        if (mode == 'V Vz'):
+            for _, plot in enumerate(plots):
+                data = Logger.get_data(plot['path'])
 
-            if invertedY:
+                V = np.sqrt(pow(data['Vx'], 2) + pow(data['Vz'], 2))
+
+                plt.figure(plot['name'])
+                plt.plot(V, data['Vz'], label=r'$V_z \ vs. V$')
+                plt.ylabel(r'$V_z$ [m/s]')
+                plt.xlabel(r'V [m/s]')
+                plt.legend()
                 plt.gca().invert_yaxis()
+
+        if (mode == 'L/D V'):
+            for _, plot in enumerate(plots):
+                data = Logger.get_data(plot['path'])
+
+                V = np.sqrt(pow(data['Vx'], 2) + pow(data['Vz'], 2))
+
+                plt.figure(plot['name'])
+                plt.plot(V, data['Vx'] / data['Vz'], label=r'$L/D \ vs. V$')
+                plt.xlabel(r'V [m/s]')
+                plt.ylabel(r'L/D')
+                plt.legend()
+
+        if (mode == 'AoAs'):
+            for _, plot in enumerate(plots):
+                data = Logger.get_data(plot['path'])
+
+                gammas = np.arctan2(data['Vz'], data['Vx'])
+                alphas = data['Gamma'] - gammas
+
+                plt.figure(plot['name'])
+                plt.plot(data['timestamp'], alphas,
+                         label=r'$\alpha$ vs. time')
+                plt.xlabel(r'time [s]')
+                plt.ylabel(r'$\alpha$ [rad]')
+                plt.legend()
+
+        if (mode == 'Gammas'):
+            for _, plot in enumerate(plots):
+                data = Logger.get_data(plot['path'])
+
+                gammas = np.arctan2(data['Vz'], data['Vx'])
+
+                plt.figure(plot['name'])
+                plt.plot(data['timestamp'], gammas,
+                         label=r'$\gamma$ vs. time')
+                plt.xlabel(r'time [s]')
+                plt.ylabel(r'$\gamma$ [rad]')
+                plt.legend()
 
         plt.show()
 
@@ -448,3 +467,33 @@ class FWLongitudinal(gym.Env):
             pygame.display.quit()
             pygame.quit()
             self.isopen = False
+
+    def demo_sigmoid_nonlinear_cl_model(self):
+        # set these parameters to change the cl vs alpha plot
+        steps = 900
+        alpha_min_deg = -30.0
+        alpha_max_deg = 40.0
+
+        alphas = np.linspace(alpha_min_deg / 180.0 * np.pi,
+                             alpha_max_deg / 180.0 * np.pi, steps)
+        action = np.linspace(1.0, -1.0, steps)
+
+        cl = np.linspace(0.0, 0.0, 900)
+        for idx, alpha in enumerate(alphas):
+            if (alpha < self.alpha_stall - 5.0 / 180.0 * np.pi).all():
+                cl[idx] = self.cl0 + self.clalpha * \
+                    alpha + self.cldelta * action[idx]
+            elif (alpha > self.alpha_stall - 5.0 / 180.0 * np.pi and alpha < self.alpha_stall + 5.0 / 180.0 * np.pi).all():
+                sigmoid_sample = self.sample_sigmoid(
+                    self.alpha_stall, 10.0 / 180.0 * np.pi, alpha)
+                cl[idx] = (self.cl0 + self.clalpha * alpha + self.cldelta * action[idx]) * \
+                    (1 - sigmoid_sample) + 2 * np.sin(alpha) * \
+                    self.cl_stall * sigmoid_sample
+            else:
+                cl[idx] = 2 * np.sin(alpha) * self.cl_stall
+
+        plt.figure('Demo non-linear AoA vs cL')
+        plt.plot(alphas, cl)
+        plt.xlabel(r'Angle of attack $\alpha$ [rad]')
+        plt.ylabel(r'Lift coefficient $c_L$')
+        plt.show()
