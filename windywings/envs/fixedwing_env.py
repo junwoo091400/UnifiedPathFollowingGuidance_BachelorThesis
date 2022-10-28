@@ -187,7 +187,7 @@ class FWLongitudinal(gym.Env):
         v_total = np.sqrt(state[2]**2 + state[3]**2)
 
         # compute angle of attack = pitch angle - flight path angle
-        gamma = np.arctan2(state[3], state[2])
+        gamma = - np.arctan2(- state[3], state[2])
         alpha = state[4] - gamma
 
         # compute lift coefficient
@@ -240,7 +240,7 @@ class FWLongitudinal(gym.Env):
         return 1.0 / (1.0 + np.exp(- sigmoid_arg))
 
     def force_thrust(self, state, action):
-        gamma = np.arctan2(state[3], state[2])
+        gamma = - np.arctan2(- state[3], state[2])
 
         # compute thrust force
         thrust = self.power * action * self.cf
@@ -264,60 +264,39 @@ class FWLongitudinal(gym.Env):
 
         return moment
 
-    def visualize_results(plots, mode):
-        if (mode == 'V Vz'):
-            for _, plot in enumerate(plots):
-                data = Logger.get_data(plot['path'])
+    def visualize_results(self, plots, mode):
+        if mode not in {'V Vz', 'L/D V', 'AoAs', 'Gammas'}:
+            print('Invalid visualization mode was chosen!')
 
-                V = np.sqrt(pow(data['Vx'], 2) + pow(data['Vz'], 2))
+        for _, plot in enumerate(plots):
+            data = Logger.get_data(plot['path'])
+            V = np.sqrt(pow(data['Vx'], 2) + pow(data['Vz'], 2))
+            gammas = - np.arctan2(data['Vz'], data['Vx'])
+            alphas = data['Gamma'] - gammas
 
-                plt.figure(plot['name'])
-                plt.plot(V, data['Vz'], label=r'$V_z \ vs. V$')
-                plt.ylabel(r'$V_z$ [m/s]')
-                plt.xlabel(r'V [m/s]')
-                plt.legend()
-                plt.gca().invert_yaxis()
-
-        if (mode == 'L/D V'):
-            for _, plot in enumerate(plots):
-                data = Logger.get_data(plot['path'])
-
-                V = np.sqrt(pow(data['Vx'], 2) + pow(data['Vz'], 2))
-
-                plt.figure(plot['name'])
-                plt.plot(V, data['Vx'] / data['Vz'], label=r'$L/D \ vs. V$')
-                plt.xlabel(r'V [m/s]')
-                plt.ylabel(r'L/D')
-                plt.legend()
-
-        if (mode == 'AoAs'):
-            for _, plot in enumerate(plots):
-                data = Logger.get_data(plot['path'])
-
-                gammas = np.arctan2(data['Vz'], data['Vx'])
-                alphas = data['Gamma'] - gammas
-
-                plt.figure(plot['name'])
-                plt.plot(data['timestamp'], alphas,
-                         label=r'$\alpha$ vs. time')
-                plt.xlabel(r'time [s]')
-                plt.ylabel(r'$\alpha$ [rad]')
-                plt.legend()
-
-        if (mode == 'Gammas'):
-            for _, plot in enumerate(plots):
-                data = Logger.get_data(plot['path'])
-
-                gammas = np.arctan2(data['Vz'], data['Vx'])
-
-                plt.figure(plot['name'])
-                plt.plot(data['timestamp'], gammas,
-                         label=r'$\gamma$ vs. time')
-                plt.xlabel(r'time [s]')
-                plt.ylabel(r'$\gamma$ [rad]')
-                plt.legend()
+            if mode == 'V Vz':
+                self.create_figure(plot['name'], V, data['Vz'], label=r'$V_z vs. V$',
+                                   labelX=r'V [m/s]', labelY=r'$V_z$ [m/s]', invertedY=True)
+            elif mode == 'L/D V':
+                self.create_figure(plot['name'], V, data['Vx'] / data['Vz'],
+                                   label=r'$L/D \ vs. V$', labelX=r'V [m/s]', labelY=r'L/D')
+            elif mode == 'AoAs':
+                self.create_figure(plot['name'], data['timestamp'], alphas,
+                                   label=r'$\gamma$ vs. time', labelX=r'time [s]', labelY=r'$\alpha$ [rad]')
+            elif mode == 'Gammas':
+                self.create_figure(plot['name'], data['timestamp'], gammas,
+                                   label=r'$\gamma$ vs. time', labelX=r'time [s]', labelY=r'$\gamma$ [rad]')
 
         plt.show()
+
+    def create_figure(self, name, dataX, dataY, label='', labelX='', labelY='', invertedY=False):
+        plt.figure(name)
+        plt.plot(dataX, dataY, label=label)
+        plt.xlabel(labelX)
+        plt.ylabel(labelY)
+        plt.legend()
+        if invertedY:
+            plt.gca().invert_yaxis()
 
     def step(self, action: np.ndarray):
         position = self.state[0:2]  # position
@@ -451,7 +430,7 @@ class FWLongitudinal(gym.Env):
                 return np.array([fixed_value, (iteration - transition_step) / (steps - transition_step) *
                                  (end_value - start_value) + start_value])
 
-        if control == 'ramp_thrust':
+        elif control == 'ramp_thrust':
             if iteration < transition_step:
                 return np.array([start_value, fixed_value])
             else:

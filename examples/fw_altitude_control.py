@@ -108,20 +108,22 @@ if __name__ == "__main__":
     fixedwing_env.demo_sigmoid_nonlinear_cl_model()
 
     # visualize the flight data from the log file in a V vs Vz plot (to identify min sink speed)
-    FWLongitudinal.visualize_results(plots=[{'path': 'results/elevator_ramp_zero_thrust.csv', 'name': 'Sink rate vs. velocity at zero thrust'},
-                                            {'path': 'results/elevator_ramp_full_thrust.csv', 'name': 'Sink rate vs. velocity at full thrust'}],
-                                     mode='V Vz')
+    fixedwing_env.visualize_results(plots=[{'path': 'results/elevator_ramp_zero_thrust.csv', 'name': 'Sink rate vs. velocity at zero thrust'},
+                                           {'path': 'results/elevator_ramp_full_thrust.csv', 'name': 'Sink rate vs. velocity at full thrust'}],
+                                    mode='V Vz')
 
     # visualize the lift vs. drag values against the velocity in a plot for zero thrust data
-    FWLongitudinal.visualize_results(plots=[{'path': 'results/elevator_ramp_zero_thrust.csv', 'name': 'Lift-drag ratio vs. velocity at zero thrust'}],
-                                     mode='L/D V')
+    fixedwing_env.visualize_results(plots=[{'path': 'results/elevator_ramp_zero_thrust.csv', 'name': 'Lift-drag ratio vs. velocity at zero thrust'}],
+                                    mode='L/D V')
 
-    FWLongitudinal.visualize_results(
+    # visualize range of angles of attack during simulation
+    fixedwing_env.visualize_results(
         plots=[{'path': 'results/elevator_ramp_zero_thrust.csv', 'name': 'AoA over time for zero thrust'},
                {'path': 'results/elevator_ramp_full_thrust.csv', 'name': 'AoA over time for full thrust'}],
         mode='AoAs')
 
-    FWLongitudinal.visualize_results(
-        plots=[{'path': 'results/elevator_ramp_zero_thrust.csv', 'name': 'Pitch angle over time for zero thrust'},
-               {'path': 'results/elevator_ramp_full_thrust.csv', 'name': 'Pitch angle over time for full thrust'}],
+    # visualize the flight path angles during simulation
+    fixedwing_env.visualize_results(
+        plots=[{'path': 'results/elevator_ramp_zero_thrust.csv', 'name': 'Flight path angle over time for zero thrust'},
+               {'path': 'results/elevator_ramp_full_thrust.csv', 'name': 'Flight path angle over time for full thrust'}],
         mode='Gammas')

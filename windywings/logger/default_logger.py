@@ -30,12 +30,13 @@ class Logger:
     def log_data(self, env, action, accelerations, time):
         acc_w_x = accelerations['linX']
         acc_w_z = accelerations['linZ']
-        gamma = env.state[4]
+        gamma = - np.arctan2(- env.state[3], env.state[2])
 
         # multiply the accelerations with the transormation matrix to body frame
-        # (rotation by gamma in mathematical positive direction around y)
-        acc_b_x = acc_w_x * np.cos(gamma) - acc_w_z * np.sin(gamma)
-        acc_b_z = acc_w_x * np.sin(gamma) + acc_w_z * np.cos(gamma)
+        # (rotation by the flight path angle in mathematical positive direction around y)
+        # assumption: body frame aligned with velocity vector frame
+        acc_b_x = acc_w_x * np.cos(gamma) + acc_w_z * np.sin(gamma)
+        acc_b_z = - acc_w_x * np.sin(gamma) + acc_w_z * np.cos(gamma)
         acc_ang_b_y = accelerations['angY']
 
         self.logger.writerow([time, action[0], action[1], env.state[2], - env.state[3], env.state[4],
