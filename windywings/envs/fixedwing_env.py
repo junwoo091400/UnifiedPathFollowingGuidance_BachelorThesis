@@ -240,14 +240,13 @@ class FWLongitudinal(gym.Env):
         return 1.0 / (1.0 + np.exp(- sigmoid_arg))
 
     def force_thrust(self, state, action):
-        gamma = - np.arctan2(- state[3], state[2])
-
         # compute thrust force
         thrust = self.power * action * self.cf
 
         # split the force into x and z components in earth fixed NED frame
-        thrustX = thrust * np.cos(gamma)
-        thrustZ = - thrust * np.sin(gamma)
+        # rotation around the lateral axis with the pitch angle as thrust is assumed in direction of the FRL
+        thrustX = thrust * np.cos(state[4])
+        thrustZ = - thrust * np.sin(state[4])
 
         return np.array([thrustX, - thrustZ])
 
@@ -334,6 +333,7 @@ class FWLongitudinal(gym.Env):
 
         if self.render_mode == "human":
             self.render()
+
         return self.state, reward, terminated, False, {'linX': acceleration[0],
                                                        'linZ': - acceleration[1], 'angY': moment / self.Iyy}
 
