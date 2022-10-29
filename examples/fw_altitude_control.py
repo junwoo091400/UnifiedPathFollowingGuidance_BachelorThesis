@@ -57,14 +57,14 @@ class Environments(unittest.TestCase):
             _, reward, done, _, accelerations = env.step(action)
             env.render()
 
-            logger.log_data(env, action, accelerations, i * env.dt)
+            logger.log_data(i, env, action, accelerations, i * env.dt)
 
             if (done):
                 env.reset()
         end_t = timer()
         print("simulation time=", end_t-start_t)
 
-    def ramp_input(self, control, start_value, transition_step, end_value, fixed_value, logfile, steps=500):
+    def control_input(self, control, start_value, transition_step, end_value, fixed_value, logfile, steps=500):
         env = gym.make('fixedwing-longitudinal')  # render_mode = 'human'
         env.reset(seed=22)
         start_t = timer()
@@ -80,7 +80,7 @@ class Environments(unittest.TestCase):
 
             # only include steady state data in the log for system identification
             if (i >= transition_step):
-                logger.log_data(env, action, accelerations, i * env.dt)
+                logger.log_data(i - transition_step, env, action, accelerations, i * env.dt)
 
             if (done):
                 env.reset()
@@ -93,13 +93,17 @@ if __name__ == "__main__":
     env = Environments()
 
     # env.test_env()
-    env.ramp_input('ramp_elevator', -1.0, 1000, 1.0, 0.0,
+    env.control_input('ramp_elevator', -1.0, 1000, 1.0, 0.0,
                    'results/elevator_ramp_zero_thrust.csv', 3000)
-    env.ramp_input('ramp_elevator', -1.0, 1000, 1.0, 1.0,
+    env.control_input('ramp_elevator', -1.0, 1000, 1.0, 1.0,
                    'results/elevator_ramp_full_thrust.csv', 3000)
-    env.ramp_input('ramp_throttle', 0.0, 200, 1.0, 0.0,
+    env.control_input('sine_elevator', -1.0, 0, 1.0, 0.0,
+                   'results/elevator_sine_zero_thrust.csv', 1500)
+    env.control_input('sine_elevator', -1.0, 0, 1.0, 1.0,
+                   'results/elevator_sine_full_thrust.csv', 1500)
+    env.control_input('ramp_throttle', 0.0, 200, 1.0, 0.0,
                    'results/throttle_ramp_slow.csv', 2000)
-    env.ramp_input('ramp_throttle', 0.0, 100, 1.0, 0.0,
+    env.control_input('ramp_throttle', 0.0, 100, 1.0, 0.0,
                    'results/throttle_ramp_fast.csv', 700)
 
     fixedwing_env = FWLongitudinal()
@@ -107,6 +111,8 @@ if __name__ == "__main__":
     # illustrate the non-linear lift model with sigmoid fusion
     fixedwing_env.demo_sigmoid_nonlinear_cl_model()
 
+    # TODO: add possibility to disable plots with corresponding argument in command line
+    # TODO: refactor code so that the illustrations for different files are shown in the same plot
     # visualize the flight data from the log file in a V vs Vz plot (to identify min sink speed)
     fixedwing_env.visualize_results(plots=[{'path': 'results/elevator_ramp_zero_thrust.csv', 'name': 'Sink rate vs. velocity at zero thrust'},
                                            {'path': 'results/elevator_ramp_full_thrust.csv', 'name': 'Sink rate vs. velocity at full thrust'}],
@@ -127,3 +133,5 @@ if __name__ == "__main__":
         plots=[{'path': 'results/elevator_ramp_zero_thrust.csv', 'name': 'Flight path angle over time for zero thrust'},
                {'path': 'results/elevator_ramp_full_thrust.csv', 'name': 'Flight path angle over time for full thrust'}],
         mode='Gammas')
+
+    # TODO: add visualizations for sine inputs

@@ -34,7 +34,6 @@
 #
 ############################################################################
 
-from cProfile import label
 import math
 from typing import Optional
 import math
@@ -133,6 +132,7 @@ class FWLongitudinal(gym.Env):
         self.ar = self.span**2 / self.Sref  # Aspect ratio
 
         # TODO: determine these values through system identification
+        # (also adapt these values for ground truth plotting in identifier)
         self.cm0 = 0.01           # Moment coefficient at zero angle of attack
         self.cmalpha = -0.487     # Moment coefficient slope
         self.cmdelta = -0.2       # Moment coefficient slope with elevator deflection
@@ -255,6 +255,10 @@ class FWLongitudinal(gym.Env):
         # total velocity from horizontal and vertical component
         v_total = np.sqrt(state[2]**2 + state[3]**2)
 
+        gamma = - np.arctan2(- state[3], state[2])
+        alpha = state[4] - gamma
+
+        # ! TODO: replace state[4] here with alpha, while ensuring that the flight dynamics stay reasonable
         # compute moment coefficient
         cm = self.cm0 + self.cmalpha * state[4] + self.cmdelta * action[1] + \
             (state[5] * self.chord / (2 * v_total)) * self.cmq
@@ -270,15 +274,15 @@ class FWLongitudinal(gym.Env):
 
         for _, plot in enumerate(plots):
             data = Logger.get_data(plot['path'])
-            V = np.sqrt(pow(data['Vx'], 2) + pow(data['Vz'], 2))
-            gammas = - np.arctan2(data['Vz'], data['Vx'])
-            alphas = data['Gamma'] - gammas
+            V = np.sqrt(pow(data['vx'], 2) + pow(data['vz'], 2))
+            gammas = - np.arctan2(data['vz'], data['vx'])
+            alphas = data['theta'] - gammas
 
             if mode == 'V Vz':
-                self.create_figure(plot['name'], V, data['Vz'], label=r'$V_z vs. V$',
+                self.create_figure(plot['name'], V, data['vz'], label=r'$V_z vs. V$',
                                    labelX=r'V [m/s]', labelY=r'$V_z$ [m/s]', invertedY=True)
             elif mode == 'L/D V':
-                self.create_figure(plot['name'], V, data['Vx'] / data['Vz'],
+                self.create_figure(plot['name'], V, data['vx'] / data['vz'],
                                    label=r'$L/D \ vs. V$', labelX=r'V [m/s]', labelY=r'L/D')
             elif mode == 'AoAs':
                 self.create_figure(plot['name'], data['timestamp'], alphas,
@@ -338,10 +342,7 @@ class FWLongitudinal(gym.Env):
         # Note that if you use custom reset bounds, it may lead to out-of-bound
         # state/observations.
         low, high = utils.maybe_parse_reset_bounds(options, -0.6, -0.4)
-        self.state = np.array([0.0, 0, self.np_random.uniform(low=10.0, high=20.0),
-                               self.np_random.uniform(low=0.0, high=5.0),
-                               self.np_random.uniform(low=-0.2, high=0.3),
-                               self.np_random.uniform(low=-0.1, high=0.1)])
+        self.state = np.array([0.0, 0, 15.0, 0.0, 0.0, 0.0])
 
         if self.render_mode == "human":
             self.render()
@@ -436,6 +437,12 @@ class FWLongitudinal(gym.Env):
             else:
                 return np.array([(iteration - transition_step) / (steps - transition_step) *
                                  (end_value - start_value) + start_value, fixed_value])
+
+        elif control == 'sine_elevator':
+            if iteration < transition_step:
+                return np.array([fixed_value, 0.0])
+            else:
+                return np.array([fixed_value, np.sin(2 * np.pi / (5 / self.dt) * (iteration - transition_step))])
 
         return np.array([0.0, 0.0])
 
