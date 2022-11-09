@@ -34,6 +34,7 @@
 
 # core modules
 import unittest
+from pathlib import Path
 
 # 3rd party modules
 import gym
@@ -59,14 +60,12 @@ class Environments(unittest.TestCase):
 
             logger.log_data(i, env, action, accelerations, i * env.dt)
 
-            if (done):
-                env.reset()
         end_t = timer()
         print("simulation time=", end_t-start_t)
 
-    def control_input(self, control, start_value, transition_step, end_value, fixed_value, logfile, steps=500):
+    def control_input(self, control, start_value, transition_step, end_value, fixed_value, logfile, steps=500, initial_state=[0.0, 0, 15.0, 0.0, 0.0, 0.0]):
         env = gym.make('fixedwing-longitudinal')  # render_mode = 'human'
-        env.reset(seed=22)
+        env.reset(seed=22, initial_state=initial_state)
         start_t = timer()
 
         logger = Logger(logfile)
@@ -80,10 +79,8 @@ class Environments(unittest.TestCase):
 
             # only include steady state data in the log for system identification
             if (i >= transition_step):
-                logger.log_data(i - transition_step, env, action, accelerations, i * env.dt)
-
-            if (done):
-                env.reset()
+                logger.log_data(i - transition_step, env,
+                                action, accelerations, i * env.dt)
 
         end_t = timer()
         print("simulation time=", end_t-start_t)
@@ -92,21 +89,30 @@ class Environments(unittest.TestCase):
 if __name__ == "__main__":
     env = Environments()
 
+    Path("results").mkdir(parents=True, exist_ok=True)
+
     # env.test_env()
-    env.control_input('ramp_elevator', -1.0, 1000, 1.0, 0.0,
-                   'results/elevator_ramp_zero_thrust.csv', 3000)
-    env.control_input('ramp_elevator', -1.0, 1000, 1.0, 1.0,
-                   'results/elevator_ramp_full_thrust.csv', 3000)
+    env.control_input('ramp_elevator', -1.0, 1000, 0.3, 0.0,
+                      'results/elevator_ramp_zero_thrust.csv', 3000, [0.0, 0, 10.0, 5.0, 0.5, 0.0])
+    env.control_input('ramp_elevator', -1.0, 1000, 0.3, 1.0,
+                      'results/elevator_ramp_full_thrust.csv', 3000, [0.0, 0, 10.0, 5.0, 0.5, 0.0])
     env.control_input('sine_elevator', -1.0, 0, 1.0, 0.0,
-                   'results/elevator_sine_zero_thrust.csv', 1500)
+                      'results/elevator_sine_zero_thrust.csv', 1500)
     env.control_input('sine_elevator', -1.0, 0, 1.0, 1.0,
-                   'results/elevator_sine_full_thrust.csv', 1500)
+                      'results/elevator_sine_full_thrust.csv', 1500)
     env.control_input('ramp_throttle', 0.0, 200, 1.0, 0.0,
-                   'results/throttle_ramp_slow.csv', 2000)
+                      'results/throttle_ramp_slow.csv', 2000)
     env.control_input('ramp_throttle', 0.0, 100, 1.0, 0.0,
-                   'results/throttle_ramp_fast.csv', 700)
+                      'results/throttle_ramp_fast.csv', 700)
+    env.control_input('ramp_throttle', 0.0, 100, 1.0, 0.0,
+                      'results/throttle_ramp_very_fast.csv', 300)
 
     fixedwing_env = FWLongitudinal()
+
+    # generate flight data for different lengths / speeds of elevator ramp inputs
+    # for k in range(0,10):
+    #     env.control_input('ramp_elevator', -1.0, 1000, 0.3, 0.0,
+    #                   'results/elevator_ramp_speed' + str(k) + '.csv', 1050 + k * 50, [0.0, 0, 10.0, 5.0, 0.5, 0.0])
 
     # illustrate the non-linear lift model with sigmoid fusion
     fixedwing_env.demo_sigmoid_nonlinear_cl_model()

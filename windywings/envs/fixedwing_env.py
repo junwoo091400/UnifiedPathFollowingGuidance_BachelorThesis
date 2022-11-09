@@ -117,7 +117,7 @@ class FWLongitudinal(gym.Env):
 
     metadata = {
         "render_modes": ["human", "rgb_array"],
-        "render_fps": 30,
+        "render_fps": 100,
     }
 
     def __init__(self, render_mode: Optional[str] = None, goal_velocity=0):
@@ -136,7 +136,7 @@ class FWLongitudinal(gym.Env):
         self.cm0 = 0.01           # Moment coefficient at zero angle of attack
         self.cmalpha = -0.487     # Moment coefficient slope
         self.cmdelta = -0.2       # Moment coefficient slope with elevator deflection
-        self.cmq = -13.8          # Moment damping coefficient
+        self.cmq = -30.0          # Moment damping coefficient
         self.cl0 = 0.2            # Lift coefficient at zero angle of attack
         self.clalpha = 2 * np.pi  # Lift coefficient slope (ideally 2*pi)
         self.cl_stall = 0.7       # Lift coefficient at stall
@@ -257,9 +257,8 @@ class FWLongitudinal(gym.Env):
         gamma = - np.arctan2(- state[3], state[2])
         alpha = state[4] - gamma
 
-        # ! TODO: replace state[4] here with alpha, while ensuring that the flight dynamics stay reasonable
         # compute moment coefficient
-        cm = self.cm0 + self.cmalpha * state[4] + self.cmdelta * action[1] + \
+        cm = self.cm0 + self.cmalpha * alpha + self.cmdelta * action[1] + \
             (state[5] * self.chord / (2 * v_total)) * self.cmq
 
         # compute moment
@@ -285,7 +284,7 @@ class FWLongitudinal(gym.Env):
                                    label=r'$L/D \ vs. V$', labelX=r'V [m/s]', labelY=r'L/D')
             elif mode == 'AoAs':
                 self.create_figure(plot['name'], data['timestamp'], alphas,
-                                   label=r'$\gamma$ vs. time', labelX=r'time [s]', labelY=r'$\alpha$ [rad]')
+                                   label=r'$\alpha$ vs. time', labelX=r'time [s]', labelY=r'$\alpha$ [rad]')
             elif mode == 'Gammas':
                 self.create_figure(plot['name'], data['timestamp'], gammas,
                                    label=r'$\gamma$ vs. time', labelX=r'time [s]', labelY=r'$\gamma$ [rad]')
@@ -337,12 +336,12 @@ class FWLongitudinal(gym.Env):
         return self.state, reward, terminated, False, {'linX': acceleration[0],
                                                        'linZ': - acceleration[1], 'angY': moment / self.Iyy}
 
-    def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
+    def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None, initial_state: Optional[np.ndarray] = [0.0, 0, 15.0, 0.0, 0.0, 0.0]):
         super().reset(seed=seed)
         # Note that if you use custom reset bounds, it may lead to out-of-bound
         # state/observations.
         low, high = utils.maybe_parse_reset_bounds(options, -0.6, -0.4)
-        self.state = np.array([0.0, 0, 15.0, 0.0, 0.0, 0.0])
+        self.state = np.array(initial_state)
 
         if self.render_mode == "human":
             self.render()
@@ -431,7 +430,7 @@ class FWLongitudinal(gym.Env):
                 return np.array([fixed_value, (iteration - transition_step) / (steps - transition_step) *
                                  (end_value - start_value) + start_value])
 
-        elif control == 'ramp_thrust':
+        elif control == 'ramp_throttle':
             if iteration < transition_step:
                 return np.array([start_value, fixed_value])
             else:
