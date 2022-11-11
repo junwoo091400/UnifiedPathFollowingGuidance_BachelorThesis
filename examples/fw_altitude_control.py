@@ -91,7 +91,6 @@ if __name__ == "__main__":
 
     Path("results").mkdir(parents=True, exist_ok=True)
 
-    # env.test_env()
     env.control_input('ramp_elevator', -1.0, 1000, 0.3, 0.0,
                       'results/elevator_ramp_zero_thrust.csv', 3000, [0.0, 0, 10.0, 5.0, 0.5, 0.0])
     env.control_input('ramp_elevator', -1.0, 1000, 0.3, 1.0,

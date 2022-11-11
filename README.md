@@ -14,7 +14,7 @@ pip install -r requirements.txt
 
 ## Testing
 
-Test the installation by running the following script
+Test the installation by removing the content from the main function, replace it with `env.test_env()` and run the script
 
 ```bash
 python3 examples/fw_altitude_control.py

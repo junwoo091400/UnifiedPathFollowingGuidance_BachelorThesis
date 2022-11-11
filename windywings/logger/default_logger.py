@@ -28,19 +28,22 @@ class Logger:
                               'ang_vel_y', 'acc_b_x', 'acc_b_z', 'ang_acc_b_y'])
 
     def log_data(self, idx, env, action, accelerations, time):
+        # get the linear accelerations in NED world frame
         acc_w_x = accelerations['linX']
         acc_w_z = accelerations['linZ']
-        gamma = - np.arctan2(- env.state[3], env.state[2])
 
-        # multiply the accelerations with the transormation matrix to body frame
-        # (rotation by the flight path angle in mathematical positive direction around y)
-        # assumption: body frame aligned with velocity vector frame
-        acc_b_x = acc_w_x * np.cos(gamma) + acc_w_z * np.sin(gamma)
-        acc_b_z = - acc_w_x * np.sin(gamma) + acc_w_z * np.cos(gamma)
+        # multiply the accelerations with the transormation matrix to body frame (aligned with FRL)
+        acc_b_x, acc_b_z = self.vector_rotation(
+            np.array([acc_w_x, acc_w_z]), env.state[4])
         acc_ang_b_y = accelerations['angY']
 
         self.logger.writerow([idx, time, action[0], action[1], env.state[2], - env.state[3], env.state[4],
                               env.state[5], acc_b_x, acc_b_z, acc_ang_b_y])
+
+    def vector_rotation(self, vector: np.array(2), angle: float):
+        rotation_matrix = np.array([[np.cos(angle), -np.sin(angle)],
+                                    [np.sin(angle), np.cos(angle)]])
+        return np.matmul(rotation_matrix, vector)
 
     def get_data(path):
         data = pd.read_csv(path)
