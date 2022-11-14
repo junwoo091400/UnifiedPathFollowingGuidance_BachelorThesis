@@ -12,18 +12,18 @@ Install the Gym environment and depdnencies
 pip install -r requirements.txt
 ```
 
-## Testing
-
-Test the installation by removing the content from the main function, replace it with `env.test_env()` and run the script
-
-```bash
-python3 examples/fw_altitude_control.py
-```
-
 ## Running the simulation
 
-In order to run the simulation, simply execute the file fw_altitude_control.py. All relevant parameters can be set directly in this file, including the simulations that should be carried out and the corresponding logfiles.
+In order to run the simulation, simply execute the file fw_altitude_control.py. All relevant parameters can be set directly in this file, including the simulations that should be carried out and the corresponding logfile paths.
 
 ```bash
-python3 examples/fw_altitude_control.py
+python3 simulations/fw_altitude_control.py
+```
+
+## Testing
+
+To test the installation, run the following script
+
+```bash
+python3 simulations/test.py
 ```

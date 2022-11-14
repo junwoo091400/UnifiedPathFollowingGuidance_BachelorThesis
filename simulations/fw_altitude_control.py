@@ -46,23 +46,6 @@ from windywings.envs.fixedwing_env import FWLongitudinal
 
 
 class Environments(unittest.TestCase):
-    def test_env(self):
-        env = gym.make('fixedwing-longitudinal', render_mode='human')
-        env.reset()
-        start_t = timer()
-
-        logger = Logger('results/data.csv')
-
-        for i, _ in enumerate(range(400)):  # dt=0.03, 400*0.03=12s
-            action = [0.0, 0.0]
-            _, reward, done, _, accelerations = env.step(action)
-            env.render()
-
-            logger.log_data(i, env, action, accelerations, i * env.dt)
-
-        end_t = timer()
-        print("simulation time=", end_t-start_t)
-
     def control_input(self, control, start_value, transition_step, end_value, fixed_value, logfile, steps=500, initial_state=[0.0, 0, 15.0, 0.0, 0.0, 0.0]):
         env = gym.make('fixedwing-longitudinal')  # render_mode = 'human'
         env.reset(seed=22, initial_state=initial_state)

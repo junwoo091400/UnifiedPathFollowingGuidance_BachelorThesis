@@ -333,10 +333,12 @@ class FWLongitudinal(gym.Env):
         if self.render_mode == "human":
             self.render()
 
-        return self.state, reward, terminated, False, {'linX': acceleration[0],
-                                                       'linZ': - acceleration[1], 'angY': moment / self.Iyy}
+        return self.state, reward, terminated, False, \
+            {'linX': acceleration[0], 'linZ': - acceleration[1],
+             'angY': self.moment_liftdrag(self.state, action) / self.Iyy}
 
-    def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None, initial_state: Optional[np.ndarray] = [0.0, 0, 15.0, 0.0, 0.0, 0.0]):
+    def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None,
+              initial_state: Optional[np.ndarray] = [0.0, 0, 15.0, 0.0, 0.0, 0.0]):
         super().reset(seed=seed)
         # Note that if you use custom reset bounds, it may lead to out-of-bound
         # state/observations.
@@ -468,7 +470,8 @@ class FWLongitudinal(gym.Env):
             if (alpha < self.alpha_stall - 5.0 / 180.0 * np.pi).all():
                 cl[idx] = self.cl0 + self.clalpha * \
                     alpha + self.cldelta * action[idx]
-            elif (alpha > self.alpha_stall - 5.0 / 180.0 * np.pi and alpha < self.alpha_stall + 5.0 / 180.0 * np.pi).all():
+            elif (alpha > self.alpha_stall - 5.0 / 180.0 * np.pi and
+                  alpha < self.alpha_stall + 5.0 / 180.0 * np.pi).all():
                 sigmoid_sample = self.sample_sigmoid(
                     self.alpha_stall, 10.0 / 180.0 * np.pi, alpha)
                 cl[idx] = (self.cl0 + self.clalpha * alpha + self.cldelta * action[idx]) * \
