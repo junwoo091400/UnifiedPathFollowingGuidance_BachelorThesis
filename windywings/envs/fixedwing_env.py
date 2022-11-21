@@ -121,7 +121,7 @@ class FWLongitudinal(gym.Env):
     }
 
     def __init__(self, render_mode: Optional[str] = None, goal_velocity=0):
-        # TODO: adapt these values according to vehicle properties
+        # example parameters
         self.mass = 20.0     # Mass of the vehicle
         self.gravity = 9.81  # Gravity
         self.chord = 0.5     # Chord length
@@ -131,8 +131,7 @@ class FWLongitudinal(gym.Env):
         self.Sref = self.chord * self.span  # Reference area
         self.ar = self.span**2 / self.Sref  # Aspect ratio
 
-        # TODO: determine these values through system identification
-        # (also adapt these values for ground truth plotting in identifier)
+        # example parameters
         self.cm0 = 0.01           # Moment coefficient at zero angle of attack
         self.cmalpha = -0.487     # Moment coefficient slope
         self.cmdelta = -0.2       # Moment coefficient slope with elevator deflection
@@ -274,7 +273,13 @@ class FWLongitudinal(gym.Env):
             data = Logger.get_data(plot['path'])
             V = np.sqrt(pow(data['vx'], 2) + pow(data['vz'], 2))
             gammas = - np.arctan2(data['vz'], data['vx'])
-            alphas = data['theta'] - gammas
+
+            theta = np.empty(data.shape[0])
+            for i in range(data.shape[0]):
+                _, theta[i], _ = Logger.quaternion_to_euler(
+                    data['q0'][i], data['q1'][i], data['q2'][i], data['q3'][i])
+
+            alphas = theta - gammas
 
             if mode == 'V Vz':
                 self.create_figure(plot['name'], V, data['vz'], label=r'$V_z vs. V$',
