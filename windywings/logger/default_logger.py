@@ -53,8 +53,12 @@ class Logger:
 
         q0, q1, q2, q3 = Logger.euler_to_quaternion(0, env.state[4], 0)
 
-        self.logger.writerow([idx, time, 0, action[0], 0, 0, action[1], env.state[2], 0, - env.state[3], q0, q1, q2, q3, 0,
-                              env.state[5], 0, acc_b_x, 0, acc_b_z, 0, acc_ang_b_y, 0])
+        # compute gravity in the body frame to subtract it from the accelerations (sensor fusion - consistency with ulogs)
+        gravity = np.array([0, -9.81])
+        gravity_b = self.vector_rotation(gravity, - env.state[4])
+
+        self.logger.writerow([idx, time, 0, action[0], 0, 0, action[1], env.state[2], 0, - env.state[3], q0,
+                             q1, q2, q3, 0, env.state[5], 0, acc_b_x + gravity_b[0], 0, acc_b_z + gravity_b[1], 0, acc_ang_b_y, 0])
 
     def vector_rotation(self, vector: np.array(2), angle: float):
         rotation_matrix = np.array([[np.cos(angle), -np.sin(angle)],
