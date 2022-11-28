@@ -3,3 +3,8 @@ register(
     id='fixedwing-longitudinal', 
     entry_point='windywings.envs:FWLongitudinal'
 )
+
+register(
+    id='fixedwing-lateral', 
+    entry_point='windywings.envs:FWLateral'
+)

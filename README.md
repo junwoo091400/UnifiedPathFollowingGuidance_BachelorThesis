@@ -19,6 +19,11 @@ In order to run the simulation, simply execute the file fw_altitude_control.py. 
 ```bash
 python3 simulations/fw_altitude_control.py
 ```
+### Lateral kinematics model
+A lateral kinematics of a fixed wing model can be run by the following example
+```bash
+python3 examples/fw_lateral_control.py
+```
 
 ## Testing
 
