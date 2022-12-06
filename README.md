@@ -12,6 +12,12 @@ Install the Gym environment and dependencies
 pip install -r requirements.txt
 ```
 
+Then install the `windywings-gym` package from source
+
+```bash
+pip install -e .
+```
+
 ### Windows setup notes with Python 3.11
 
 In Windows, `pip install -r requirements.txt` with Python 3.11 will likely fail, because `torch` module isn't available / `gym` module has dependencies with installation errors.
