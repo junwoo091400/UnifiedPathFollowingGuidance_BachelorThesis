@@ -118,7 +118,16 @@ class FWLateral(gym.Env):
     }
 
     def __init__(self, render_mode: Optional[str] = None, goal_velocity=0):
-        # Angle of attack at stall
+        """ Initialize the Environment """
+        # Open AI Gym related parameters (rendering)
+        self.render_mode = render_mode
+        self.screen_width = 600
+        self.screen_height = 600
+        self.screen = None
+        self.clock = None
+        self.isopen = True
+
+        # Vehicle dynamic configuration parameters
         self.dt = 0.03
         self.min_action = -1.0
         self.max_action = 1.0
@@ -127,7 +136,7 @@ class FWLateral(gym.Env):
         self.max_speed = 50.0
         self.min_speed = 0.0
         self.max_acceleration = 1.0
-
+        self.gravity = np.array([0.0, -9.81])
         self.low_state = np.array(
             [self.min_position, self.min_position, self.min_speed, self.min_speed, -3.14, -100.0], dtype=np.float32
         )
@@ -135,38 +144,39 @@ class FWLateral(gym.Env):
             [self.max_position, self.max_position, self.max_speed, self.max_speed, 3.14, 100.0], dtype=np.float32
         )
 
-        self.render_mode = render_mode
+        # Vehicle state (Pos X, Pos Y, Ground Speed, Heading)
+        # self.state = np.array([0, 0, 10.0, 0.0], dtype=np.float32)
 
-        self.screen_width = 600
-        self.screen_height = 600
-        self.screen = None
-        self.clock = None
-        self.isopen = True
+        # Runtime variables (not part of state, but used for calculations)
+        self.acceleration = 0.0
 
-        self.action_space = spaces.Box(
-            low=self.min_action, high=self.max_action, shape=(1,), dtype=np.float32
-        )
-        self.observation_space = spaces.Box(
-            low=self.low_state, high=self.high_state, dtype=np.float32
-        )
-        self.gravity = np.array([0.0, -9.81])
-
+        # Statistics
         ##TODO: Hack! Initialize position history properly
         self.position_history = [[0.0, 0.0]]
         self.position_history = np.append(self.position_history, [[0.0, 1.0]], axis=0)
 
+        # GYM internal variables
+        # Action space
+        self.action_space = spaces.Box(
+            low=self.min_action, high=self.max_action, shape=(1,), dtype=np.float32
+        )
+        # Observation space
+        self.observation_space = spaces.Box(
+            low=self.low_state, high=self.high_state, dtype=np.float32
+        )
+
     def step(self, action: np.ndarray):
         position = self.state[0:2]  # position
-        velocity = self.state[2]  # velocity
+        velocity = self.state[2]    # velocity
         heading = self.state[3]     # heading
 
         acceleration_cmd = action[0]
         yawrate_cmd = action[1]
 
-        acceleration = self.max_acceleration * acceleration_cmd
+        self.acceleration = self.max_acceleration * acceleration_cmd
 
         position = position + velocity * np.array([np.math.cos(heading), np.math.sin(heading)]) * self.dt
-        velocity = velocity + acceleration * self.dt
+        velocity = velocity + self.acceleration * self.dt
         heading = heading + yawrate_cmd * self.dt
 
         # Convert a possible numpy bool to a Python bool.
@@ -178,13 +188,25 @@ class FWLateral(gym.Env):
         if terminated:
             reward = 0.0
         reward -= math.pow(action[0], 2) * 0.1
+
         self.state = np.array([position[0], position[1], velocity, heading], dtype=np.float32)
         self.position_history = np.append(self.position_history, [[position[0], position[1]]], axis=0)
+
         if self.render_mode == "human":
             self.render()
 
-        return self.state, reward, terminated, False, \
-            {'linX': acceleration, 'linY': 0.0, 'angZ': 0.0}
+        # Observation, Reward, Done, Info: https://www.gymlibrary.dev/content/environment_creation/#step
+        return self._get_obs(), reward, terminated, self._get_info()
+
+    def _get_obs(self):
+        """ Get Observation from internal state """
+        # Return raw state. TODO: Fix to only include sane observation values
+        return self.state
+        #return {"state": self.state}
+
+    def _get_info(self):
+        """ Get Information from internal state """
+        return {'linX': self.acceleration, 'linY': 0.0, 'angZ': 0.0}
 
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None,
               initial_state: Optional[np.ndarray] = [0.0, 0, 15.0, 0.0, 0.0, 0.0]):

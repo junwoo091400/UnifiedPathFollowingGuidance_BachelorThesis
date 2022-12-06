@@ -53,7 +53,10 @@ class Environments(unittest.TestCase):
 			##TODO: Implement guidance controller here
 			# action = env.control()
 			yawrate_cmd = np.math.sin(0.03 * i)
-			_, reward, done, _, _ = env.step([0.0, yawrate_cmd]) # take a random action
+			
+			# Observation, Reward, Done, Info
+			_, reward, done, _ = env.step([0.0, yawrate_cmd]) # take a random action
+			
 			if(done):
 				env.reset()
 		end_t=timer()
