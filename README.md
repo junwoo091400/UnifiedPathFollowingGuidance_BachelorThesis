@@ -14,7 +14,7 @@ pip install -r requirements.txt
 
 ### Windows setup notes with Python 3.11
 
-In Windows, the above setup script with Python 3.11 will likely fail, because `torch` module isn't available / `gym` module has dependencies with installation errors.
+In Windows, `pip install -r requirements.txt` with Python 3.11 will likely fail, because `torch` module isn't available / `gym` module has dependencies with installation errors.
 
 > Note: I'm not sure if the `torch` module missing issue would arise in Ubuntu dev environment as well, but the `pygame` build issue will probably occur if using Python 3.11.
 
@@ -23,6 +23,16 @@ In Windows, the above setup script with Python 3.11 will likely fail, because `t
 1. Comment out `torch` line in the `requirements.txt`, to avoid installation.
 2. Download MSVC v140 compiler, as documented [here](https://www.pygame.org/wiki/CompileWindows#Step%201,%20Get%20a%20C/C++%20compiler.)
 3. Download pre-release version via: `pip install pygame --pre` (reason explained [here](https://github.com/pygame/pygame/issues/3522#issuecomment-1293981862)), to avoid compilation issue due to recent upgrade of Python 3.11, where the header `longintrepr.h` was moved.
+
+Furthermore, when installing the `windywings-gym` module, the `torch` and `gym` part need to be removed from the `setup.py`, since pip will try to automatically install those dependencies, and will fail. Here's an example showing how the requirement code can be edited:
+
+```python
+# setup.py
+install_requires=[#'gym[classic_control]',
+                    'numpy',
+                    'matplotlib']#,
+                    #'torch']
+```
 
 ## Running the simulation
 
