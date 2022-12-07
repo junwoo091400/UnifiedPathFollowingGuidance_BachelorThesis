@@ -41,7 +41,7 @@ import math
 import numpy as np
 
 import gym
-from gym import spaces
+from gym.spaces import Dict, Box
 from gym.envs.classic_control import utils
 from gym.error import DependencyNotInstalled
 
@@ -156,13 +156,22 @@ class FWLateral(gym.Env):
         self.position_history = np.append(self.position_history, [[0.0, 1.0]], axis=0)
 
         # GYM internal variables
+        
         # Action space
-        self.action_space = spaces.Box(
+        self.action_space = Box(
             low=self.min_action, high=self.max_action, shape=(1,), dtype=np.float32
         )
+
         # Observation space
-        self.observation_space = spaces.Box(
-            low=self.low_state, high=self.high_state, dtype=np.float32
+        self.observation_space = Dict(
+            {
+                "Vehicle": Dict(
+                    {
+                        "Position": Box(low=self.min_position, high=self.max_position, shape=(2,)),
+                        "Speed": Box(low=self.min_speed, high=self.max_speed, shape=(1,))
+                    }
+                )
+            }
         )
 
     def step(self, action: np.ndarray):
@@ -200,25 +209,30 @@ class FWLateral(gym.Env):
 
     def _get_obs(self):
         """ Get Observation from internal state """
-        # Return raw state. TODO: Fix to only include sane observation values
-        return self.state
-        #return {"state": self.state}
+        position = self.state[0:2]
+        # Note: since 'speed' observation space is defined in (1, ) shape, the speed component
+        # needs to be converted into the list first, before turning into an np.array, to not have
+        # "The obs returned by the `reset()` method is not within the observation space" error.
+        # E.g. Without bracket: "array(15., dtype=float32)", With bracket: "array([15.], dtype=float32)"
+        speed = np.array([self.state[2]])
+        return {"Vehicle": {"Position": position, "Speed": speed}}
 
     def _get_info(self):
         """ Get Information from internal state """
         return {'linX': self.acceleration, 'linY': 0.0, 'angZ': 0.0}
 
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None,
-              initial_state: Optional[np.ndarray] = [0.0, 0, 15.0, 0.0, 0.0, 0.0]):
+              initial_state: Optional[np.ndarray] = [0.0, 0.0, 15.0, 0.0, 0.0, 0.0]):
         super().reset(seed=seed)
         # Note that if you use custom reset bounds, it may lead to out-of-bound
         # state/observations.
         low, high = utils.maybe_parse_reset_bounds(options, -0.6, -0.4)
-        self.state = np.array(initial_state)
+        self.state = np.array(initial_state, dtype=np.float32)
 
         if self.render_mode == "human":
             self.render()
-        return np.array(self.state, dtype=np.float32), {}
+        
+        return (self._get_obs(), self._get_info())
 
     def _height(self, xs):
         return 0.0 * xs
