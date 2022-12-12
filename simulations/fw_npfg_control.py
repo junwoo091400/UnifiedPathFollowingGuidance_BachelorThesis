@@ -40,16 +40,18 @@ class LinePathDrawWrapper(gym.Wrapper):
 class Environments(unittest.TestCase):
     def __init__(self):
         # NPFG Test Environment
-        screen_width, screen_height = 1200, 1200
+        screen_width, screen_height = 600, 600
+        world_size = 200.0 # Size of the simulated world (e.g. Width) in meters (will be scaled to screen internally)
         DEBUG_ENABLE = True
 
-        self.env = gym.make('fixedwing-lateral-npfg', screen_size = [screen_width, screen_height], render_mode='human', DEBUG = DEBUG_ENABLE)
+        # World size of 200 means that it's a 200 m x 200 m space that vehicle can fly in
+        self.env = gym.make('fixedwing-lateral-npfg', world_size = world_size, screen_size = [screen_width, screen_height], render_mode='human', DEBUG = DEBUG_ENABLE)
 
         # Initial state setting
         # PosX: 0, PosY: 0, Speed: 15, Heading: 0
         # PathX: 0, PathY: 0, PathHeading: PI/4, PathCurvature: 0
-        posX = screen_width/2
-        posY = screen_height/2
+        posX = -world_size/2 # Start at leftmost side
+        posY = 0.0
         path_heading = np.pi/4
         path_curvature = 0
 
@@ -74,6 +76,9 @@ class Environments(unittest.TestCase):
 
         end_t=timer()
         print("simulation time=",end_t-start_t)
+
+        # Wait for user input (to give time for screen capture)
+        input('Waiting for user ...')
 
 if __name__ == "__main__":
     env=Environments()

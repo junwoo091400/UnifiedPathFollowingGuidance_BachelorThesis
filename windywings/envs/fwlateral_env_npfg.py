@@ -129,12 +129,16 @@ class FWLateralNPFG(gym.Env):
         "render_fps": 100,
     }
 
-    def __init__(self, screen_size = [1200, 1200], render_mode: Optional[str] = None, DEBUG = False):
-        """ Initialize the Environment """
+    def __init__(self, screen_size = [1200, 1200], world_size = 100., render_mode: Optional[str] = None, DEBUG = False):
+        """ Initialize the Environment (Screen size: Actual display size, World size: size of the world that will be self.world_to_screen_scalingd & projected onto the screen) """
         assert len(screen_size) == 2, "Screen size [Width, Height] not an array with length 2!"
+        assert world_size > 0, "World size (width & height) must be a positive number!"
+
         # Open AI Gym related parameters (rendering)
         self.render_mode = render_mode
         self.screen_width, self.screen_height = screen_size
+        self.world_size = world_size
+        self.world_to_screen_scaling = np.max(screen_size)/world_size # We scale so that we fit the world to the maximum height/width, so unless square shaped, the world will be cut
         self.screen = None
         self.clock = None
         self.isopen = True
@@ -143,8 +147,8 @@ class FWLateralNPFG(gym.Env):
         self.dt = 0.03
         self.min_action = -1.0
         self.max_action = 1.0
-        self.min_position = -100.0
-        self.max_position = 100.0
+        self.min_position = -world_size/2
+        self.max_position = world_size/2
         self.max_speed = 50.0
         self.min_speed = 0.0
         self.max_acceleration = 1.0
@@ -233,8 +237,9 @@ class FWLateralNPFG(gym.Env):
         self.state = np.array([position[0], position[1], velocity, heading, path_pos[0], path_pos[1], path_bearing, path_curvature], dtype=np.float32)
 
         # Debug Output
-        if (self._debug_enable):
-            print('Debug, state: {}'.format(self.state))
+        # if (self._debug_enable):
+        #     # print('Debug, state: {}'.format(self.state))
+        #     print('Position history shape: {}'.format(np.shape(self.position_history)))
 
         # Save Position history
         if self.position_history is not None:
@@ -297,6 +302,13 @@ class FWLateralNPFG(gym.Env):
     def _height(self, xs):
         return 0.0 * xs
 
+    def world2screen(self, coords: np.array):
+        ''' Converts the world coordinate (in meters) to a pixel location in Rendering screen '''
+        assert np.shape(coords) == (2, ), "Coordinates to transform in World2Screen must be of size (2, )!"
+        # We want to place the (0.0, 0.0) in the middle of the screen, therefore the transform is:
+        # (X): Screen-size/2 + coordinateX * scaling
+        return np.array([self.screen_width/2, self.screen_height/2]) + coords * self.world_to_screen_scaling
+
     def render(self):
         if self.render_mode is None:
             gym.logger.warn(
@@ -333,8 +345,6 @@ class FWLateralNPFG(gym.Env):
             self.clock = pygame.time.Clock()
 
         # Constants
-        world_width = self.max_position - self.min_position
-        scale = self.screen_width / world_width
         carlength = 20
         carwidth = 10
 
@@ -349,19 +359,21 @@ class FWLateralNPFG(gym.Env):
         clearance = 200
 
         # Draw Position History
-        if self.position_history is not None and self.position_history.shape[0] > 1:
-            xys = list(zip((self.position_history[:, 0] + 50.0) * scale, self.position_history[:, 1] * scale + clearance))
+        if (self.position_history is not None) and (self.position_history.shape[0] > 1):
+            xys = list(zip(map(self.world2screen, self.position_history)))
             pygame.draw.aalines(self.surf, points=xys, closed=False, color=(120, 120, 255))
 
         # Draw the Vehicle
         r, t, b = carlength, 0.5 * carwidth, -0.5 * carwidth
         coords = []
+        posScreen = self.world2screen(pos) # Convert to screen pixel scale
         for c in [(0, t), (0, b), (r, 0)]:
             c = pygame.math.Vector2(c).rotate_rad(yaw)
             coords.append(
                 (
-                    c[0] + (pos[0] + 50.0) * scale,
-                    c[1] + clearance + pos[1] * scale,
+                    
+                    c[0] + posScreen[0],
+                    c[1] + posScreen[1]
                 )
             )
         gfxdraw.aapolygon(self.surf, coords, (0, 0, 0))
@@ -374,13 +386,8 @@ class FWLateralNPFG(gym.Env):
         path_unit_tangent_vector = np.array([np.cos(path_bearing), np.sin(path_bearing)])
 
         PATH_LENGTH_HALF = 2000 # Arbitrary length to extend the path to draw the line in the frame
-        path_start_pos = path_pos - path_unit_tangent_vector * PATH_LENGTH_HALF
-        path_end_pos = path_pos + path_unit_tangent_vector * PATH_LENGTH_HALF
-        
-        # NOTE: Convert into integer & put in `tuple` data type
-        path_start_pos = tuple(map(int, path_start_pos))
-        path_end_pos = tuple(map(int, path_end_pos))
-        # tuple(map(int, np.clip(path_end_pos, 0, self.screen_width)))
+        path_start_pos = self.world2screen(path_pos - path_unit_tangent_vector * PATH_LENGTH_HALF)
+        path_end_pos = self.world2screen(path_pos + path_unit_tangent_vector * PATH_LENGTH_HALF)
         
         if (np.isfinite(path_start_pos).all() and np.isfinite(path_end_pos).all()):
             # Only draw when the coordinates are finite (defined)
