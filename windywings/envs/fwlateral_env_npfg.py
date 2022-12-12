@@ -47,6 +47,7 @@ from gym.error import DependencyNotInstalled
 
 from windywings.logger.default_logger import Logger
 from matplotlib import pyplot as plt
+from matplotlib.animation import FuncAnimation
 
 # Dirty import of NPFG library
 from windywings.npfg.npfg import NPFG
@@ -173,6 +174,12 @@ class FWLateralNPFG(gym.Env):
         self._debug_enable = DEBUG
         self._vehicle_time = 0.0 # Integral with the `self.dt`. Time that vehicle 'feels'.
 
+        # Pyplot plotting
+        # self.fig, self.ax = plt.subplots()
+        # self.ln, = self.ax.plot([], [], 'ro')
+        # self.fig_animation = FuncAnimation(self.fig, self.pyplot_animation, blit=True, interval=1000//self.metadata["render_fps"])
+        # plt.show() # This is blocking. Need to get around that: https://matplotlib.org/stable/users/explain/interactive_guide.html
+
         # Statistics
         self.position_history = None
 
@@ -278,6 +285,10 @@ class FWLateralNPFG(gym.Env):
         # NOTE: Keep longitudinal acc cmd at 0 for now.
         return np.array([0.0, lateral_acc_cmd])
     
+    def pyplot_animation(self, frame):
+        ''' Boilerplate code for live-updating Pyplot to show debug values (e.g. NPFG) '''
+        print('Animation: frame {}, time {}'.format(frame, self._vehicle_time))
+
     def _get_obs(self):
         """ Get Observation from internal state """
         return self.state
@@ -359,10 +370,8 @@ class FWLateralNPFG(gym.Env):
         self.surf.fill((255, 255, 255))
 
         # State retrieval
-        pos = np.array([self.state[0], self.state[1]])
-        yaw = self.state[3]
-
-        clearance = 200
+        vehicle_pos = self.world2screen(self.state[0:2])
+        vehicle_yaw = self.state[3]
 
         # Draw Position History
         if (self.position_history is not None) and (self.position_history.shape[0] > 1):
@@ -372,12 +381,11 @@ class FWLateralNPFG(gym.Env):
         # Draw the Vehicle
         r, t, b = carlength, 0.5 * carwidth, -0.5 * carwidth
         coords = []
-        posScreen = self.world2screen(pos) # Convert to screen pixel scale
+        posScreen = vehicle_pos # Convert to screen pixel scale
         for c in [(0, t), (0, b), (r, 0)]:
-            c = pygame.math.Vector2(c).rotate_rad(yaw)
+            c = pygame.math.Vector2(c).rotate_rad(vehicle_yaw)
             coords.append(
                 (
-                    
                     c[0] + posScreen[0],
                     c[1] + posScreen[1]
                 )
@@ -402,6 +410,10 @@ class FWLateralNPFG(gym.Env):
             except Exception as e:
                 print(e)
                 print('Path start: {}, Path end: {}'.format(path_start_pos, path_end_pos))
+
+        # Draw NPFG internal calculations
+        # print(self._npfg.d_air_vel_ref, self._npfg.d_bearing_vector, self._npfg.d_look_ahead_angle_from_track_error)
+        pygame.draw.line(self.surf, pygame.Color('grey'), vehicle_pos, self.world2screen(self._npfg.d_closest_point_on_path))
 
         # Drawing the diagram & flipping Y axis
         self.surf = pygame.transform.flip(self.surf, False, True) # Flips the surface drawing in Y-axis, so that frame coordinate wise, X is RIGHT, Y is UP in the visualization

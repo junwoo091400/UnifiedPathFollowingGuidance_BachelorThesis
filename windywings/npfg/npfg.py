@@ -33,6 +33,20 @@ class NPFG:
 
         # Internal Variables for Runtime calculation (needed for implementation details)
 
+        # Internal Variables for debugging only! (Should not be 'read' internally)
+        self.d_position_error_vec = np.array([0.0, 0.0])
+        self.d_unit_path_tangent = np.array([1.0, 0.0])
+        self.d_signed_track_error = 0.0
+        self.d_track_error_bound = 0.0
+        self.d_normalized_track_error = 0.0
+        self.d_look_ahead_angle_from_track_error = 0.0
+        self.d_track_proximity = 0.0
+        self.d_bearing_vector = np.array([1.0, 0.0])
+        self.d_air_vel_ref = np.array([15.0, 0.0])
+        self.d_lateral_accel_no_curve = 0.0
+        self.d_lateral_accel_ff_curve = 0.0
+        self.d_closest_point_on_path = np.array([0.0, 0.0])
+
     def trackErrorBound(self, ground_speed, time_constant):
         """ Calculates continuous ground track error bound depending on ground speed """
         assert np.shape(ground_speed) == ( ), "Ground speed : {}, shape: {}".format(ground_speed, np.shape(ground_speed))
@@ -158,6 +172,16 @@ class NPFG:
         lateral_accel = self.lateralAccel(air_vel, air_vel_ref)
         lateral_accel_curve = self.lateralAccelFF(unit_path_tangent, ground_vel, air_speed, signed_track_error, curvature)
 
+        # Debug values
+        self.d_track_error_bound = track_error_bound
+        self.d_normalized_track_error = normalized_track_error
+        self.d_look_ahead_angle_from_track_error = look_ahead_ang
+        self.d_track_proximity = track_proximity
+        self.d_bearing_vector = bearing_vector
+        self.d_air_vel_ref = air_vel_ref
+        self.d_lateral_accel_no_curve = lateral_accel
+        self.d_lateral_accel_ff_curve = lateral_accel_curve
+
         return lateral_accel + feas_combined * track_proximity * lateral_accel_curve
 
     def navigatePathTangent_nowind(self, vehicle_pos, position_setpoint, tangent_setpoint, ground_vel, curvature):
@@ -174,6 +198,12 @@ class NPFG:
         closest_point_on_path = position_setpoint + np.dot(unit_path_tangent, position_error_vec) * unit_path_tangent
         # TODO: Clarify why the PX4 implementation uses the `position setpoint` directly as the closest point on path, cuz it's not guaranteed to be :/
         # But, it seems that `closest_point_on_path_` doesn't really affect the behavior of function tough, so not relevant.
+
+        # Debug values
+        self.d_closest_point_on_path = closest_point_on_path
+        self.d_position_error_vec = position_error_vec
+        self.d_unit_path_tangent = unit_path_tangent
+        self.d_signed_track_error = signed_track_error
 
         return self.guideToPath_nowind(ground_vel, unit_path_tangent, signed_track_error, curvature)
 
