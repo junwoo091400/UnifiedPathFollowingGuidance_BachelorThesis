@@ -412,8 +412,11 @@ class FWLateralNPFG(gym.Env):
                 print('Path start: {}, Path end: {}'.format(path_start_pos, path_end_pos))
 
         # Draw NPFG internal calculations
-        # print(self._npfg.d_air_vel_ref, self._npfg.d_bearing_vector, self._npfg.d_look_ahead_angle_from_track_error)
-        pygame.draw.line(self.surf, pygame.Color('grey'), vehicle_pos, self.world2screen(self._npfg.d_closest_point_on_path))
+        # Closest point on path (connect with vehicle)
+        closest_point_on_path = self.world2screen(self._npfg.d_closest_point_on_path)
+        pygame.draw.line(self.surf, pygame.Color('grey'), vehicle_pos, closest_point_on_path)
+        UPT_LENGTH = 20 # Multiplier on the length of the unit path tangent vector to draw
+        pygame.draw.line(self.surf, pygame.Color('green'), closest_point_on_path, closest_point_on_path + self._npfg.d_unit_path_tangent * self.world_to_screen_scaling * UPT_LENGTH) # Manually scale the vector
 
         # Drawing the diagram & flipping Y axis
         self.surf = pygame.transform.flip(self.surf, False, True) # Flips the surface drawing in Y-axis, so that frame coordinate wise, X is RIGHT, Y is UP in the visualization
