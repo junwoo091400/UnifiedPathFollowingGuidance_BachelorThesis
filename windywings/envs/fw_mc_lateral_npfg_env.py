@@ -48,6 +48,7 @@ from gym.error import DependencyNotInstalled
 from windywings.logger.default_logger import Logger
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
+from scipy.spatial.transform import Rotation
 
 # Dirty import of NPFG library
 from windywings.npfg.npfg import NPFG
@@ -160,13 +161,14 @@ class FWMCLateralNPFG(gym.Env):
         self.max_action = 1.0
         self.min_position = -world_size/2
         self.max_position = world_size/2
-        self.max_acceleration = 1.0
         self.gravity = np.array([0.0, -9.81])
 
         if self._vehicle_type == 'multicopter':
             # Multicopter constraints
             self.max_longitudinal_speed = 50.0
             self.min_longitudinal_speed = -50.0
+            self.min_longitudinal_acceleration = -10.0
+            self.max_longitudinal_acceleration = 10.0
             self.max_lateral_speed = 50.0
             self.min_lateral_speed = -50.0
             self.min_lateral_acceleration = -10.0 # Sane lateral accel limit
@@ -178,13 +180,15 @@ class FWMCLateralNPFG(gym.Env):
             # Fixedwing constraints
             self.max_longitudinal_speed = 50.0
             self.min_longitudinal_speed = 0.0
+            self.min_longitudinal_acceleration = -1.0
+            self.max_longitudinal_acceleration = 1.0
             self.max_lateral_speed = 0.0
             self.min_lateral_speed = 0.0
             self.min_lateral_acceleration = -10.0 # Sane lateral accel limit
             self.max_lateral_acceleration = 10.0 # Sane lateral accel limit
             # these are specifically for verbosely setting NPFG parameters
             self.airspeed_nom = 15.0
-            self.airspeed_ref = 15.0
+            self.airspeed_ref = 15.0 #NOTE: FW doesn't suffer from oscillations when airspeed ref is set close to 0 (e.g. 0.1)
 
         # State: PosX, PosY, V_longitudinal, Heading, PathX, PathY, PathHeading, PathCurvature, V_lateral
         self.low_state = np.array(
@@ -199,6 +203,8 @@ class FWMCLateralNPFG(gym.Env):
 
         # Runtime variables (not part of state, but used for calculations)
         self.longitudinal_acceleration = 0.0
+        self.lateral_acceleration = 0.0
+
         self._debug_enable = DEBUG
         self._sim_time = 0.0 # Integral with the `self.dt`. Time that vehicle 'feels'.
 
@@ -238,33 +244,48 @@ class FWMCLateralNPFG(gym.Env):
         self._sim_time += self.dt
         
         # State retrieval
-        position = self.state[0:2]  # position
+        position = self.state[0:2]
         longitudinal_speed = self.state[2]
-        heading = self.state[3]     # heading
+        heading = self.state[3]
         path_pos = self.state[4:6]
         path_bearing = self.state[6]
         path_curvature = self.state[7]
         lateral_speed = self.state[8]
 
         lon_accel_cmd = action[0]
-        # Important: CLIP accel command to something vehicle can handle!
-        lat_accel_cmd = np.clip(action[1], self.min_lateral_acceleration, self.max_lateral_acceleration)
-
-        self.longitudinal_acceleration = self.max_acceleration * lon_accel_cmd
+        lat_accel_cmd = action[1]
 
         if self._vehicle_type == 'multicopter':
+            # The acceleration command needs to be applied relative to vehicle's air-mass relative velocity
+            # Because FW NPFG logic relies on the assumption that vehicle is heading towards the air-mass relative velocity
+            # but for MC, that assumption breaks down (`heading` is completely separated!)
+
+            # Vehicle velocity in global frame
+            vehicle_velocity = longitudinal_speed * np.array([np.math.cos(heading), np.math.sin(heading)]) + lateral_speed * np.array([-np.math.sin(heading), np.math.cos(heading)])
+            velocity_bearing = np.arctan2(vehicle_velocity[1], vehicle_velocity[0])
+
+            # rotate acceleration command from velocity coordinate frame to vehicle frame rotate by (velocity bearing - vehicle bearing)
+            raw_accel_cmd_3d = np.array([lon_accel_cmd, lat_accel_cmd, 0.0])
+            rot = Rotation.from_euler('z', (velocity_bearing - heading))
+            accel_cmd_body = rot.apply(raw_accel_cmd_3d)[0:2] # Acceleration command in body frame
+            lon_accel_cmd = np.clip(accel_cmd_body[0], self.min_longitudinal_acceleration, self.max_longitudinal_acceleration)
+            lat_accel_cmd = np.clip(accel_cmd_body[1], self.min_lateral_acceleration, self.max_lateral_acceleration)
+            
             # Multicopter dynamics
-            position = position + longitudinal_speed * np.array([np.math.cos(heading), np.math.sin(heading)]) * self.dt
-            position = position + lateral_speed * np.array([-np.math.sin(heading), np.math.cos(heading)]) * self.dt
-            longitudinal_speed = longitudinal_speed + self.longitudinal_acceleration * self.dt
+            position = position + vehicle_velocity * self.dt
+            longitudinal_speed = longitudinal_speed + lon_accel_cmd * self.dt
             lateral_speed = lateral_speed + lat_accel_cmd * self.dt
 
         else:
+            # Clip accel commands
+            lon_accel_cmd = np.clip(lon_accel_cmd, self.min_longitudinal_acceleration, self.max_longitudinal_acceleration)
+            lat_accel_cmd = np.clip(lat_accel_cmd, self.min_lateral_acceleration, self.max_lateral_acceleration)
+
             # Fixed-Wing dynamics
             position = position + longitudinal_speed * np.array([np.math.cos(heading), np.math.sin(heading)]) * self.dt
 
             # NOTE: Longitudinal acceleration setpoint gets instantaneously applied, and it doesn't affect yaw rate!
-            longitudinal_speed = longitudinal_speed + self.longitudinal_acceleration * self.dt
+            longitudinal_speed = longitudinal_speed + lon_accel_cmd * self.dt
 
             # 'Lateral acceleration' in the end results in a yaw-rate. Which has a following dynamic:
             # lat_acc = velocity * yaw_rate. Therefore yaw_rate = (lat_acc / velocity)!
@@ -273,13 +294,13 @@ class FWMCLateralNPFG(gym.Env):
             # NOTE: Yaw rate command gets instantaneously applied in global frame.
             heading = heading + yawrate_cmd * self.dt
 
+        # Save cached values
+        self.longitudinal_acceleration = lon_accel_cmd
+        self.lateral_acceleration = lat_accel_cmd
+
+        # Set state vector
         self.state = np.array([position[0], position[1], longitudinal_speed, heading, path_pos[0], path_pos[1], path_bearing, path_curvature, lateral_speed], dtype=np.float32)
-
-        # Debug Output
-        # if (self._debug_enable):
-        #     # print('Debug, state: {}'.format(self.state))
-        #     print('Position history shape: {}'.format(np.shape(self.position_history)))
-
+        
         # Save Position history
         if self.position_history is not None:
             self.position_history = np.append(self.position_history, [[position[0], position[1]]], axis=0)
@@ -448,6 +469,8 @@ class FWMCLateralNPFG(gym.Env):
                 print(e)
                 print('Path start: {}, Path end: {}'.format(path_start_pos, path_end_pos))
 
+        # Draw resulting action commands (Interpretation of the `action` in `step` function!)
+
         # Draw NPFG internal calculations
         # Closest point on path (connect with vehicle)
         closest_point_on_path = self.world2screen(self._npfg.d_closest_point_on_path)
@@ -480,6 +503,8 @@ class FWMCLateralNPFG(gym.Env):
         debug_text += 'tp: {:.2f} '.format(self._npfg.d_track_proximity)
         debug_text += 'at: {:.2f} '.format(self._npfg.d_lateral_accel_no_curve)
         debug_text += 'ac: {:.2f} '.format(self._npfg.d_lateral_accel_ff_curve)
+        debug_text += 'Ax: {:.1f} '.format(self.longitudinal_acceleration)
+        debug_text += 'Ay: {:.1f} '.format(self.lateral_acceleration)
 
         debug_font = pygame.font.SysFont(None, 24)
         debug_img = debug_font.render(debug_text, True, (0, 0, 0))
