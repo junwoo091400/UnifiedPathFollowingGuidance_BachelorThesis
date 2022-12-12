@@ -10,6 +10,6 @@ register(
 )
 
 register(
-    id='fixedwing-lateral-npfg', 
-    entry_point='windywings.envs:FWLateralNPFG'
+    id='multicopter-fixedwing-lateral-npfg', 
+    entry_point='windywings.envs:FWMCLateralNPFG'
 )

@@ -48,7 +48,7 @@ class Environments(unittest.TestCase):
         self._stop_every_1_sec = False
 
         # World size of 200 means that it's a 200 m x 200 m space that vehicle can fly in
-        self.env = gym.make('fixedwing-lateral-npfg', world_size = world_size, screen_size = [screen_width, screen_height], render_mode='human', DEBUG = DEBUG_ENABLE)
+        self.env = gym.make('multicopter-fixedwing-lateral-npfg', vehicle_type = 'fixedwing', world_size = world_size, screen_size = [screen_width, screen_height], render_mode='human', DEBUG = DEBUG_ENABLE)
 
         # Initial state setting
         posX = -world_size/2
@@ -61,7 +61,7 @@ class Environments(unittest.TestCase):
         path_heading = 0#np.pi/4
         path_curvature = 0.0#0.01
 
-        initial_state = np.array([posX, posY, vehicle_speed, vehicle_heading, pathX, pathY, path_heading, path_curvature], dtype=np.float32)
+        initial_state = np.array([posX, posY, vehicle_speed, vehicle_heading, pathX, pathY, path_heading, path_curvature, 0.0], dtype=np.float32)
         
         self.env.reset(initial_state=initial_state)
 
