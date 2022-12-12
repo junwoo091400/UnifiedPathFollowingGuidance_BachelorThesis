@@ -170,7 +170,8 @@ class FWLateralNPFG(gym.Env):
 
         # Runtime variables (not part of state, but used for calculations)
         self.longitudinal_acceleration = 0.0
-        self._debug_enable = DEBUG        
+        self._debug_enable = DEBUG
+        self._vehicle_time = 0.0 # Integral with the `self.dt`. Time that vehicle 'feels'.
 
         # Statistics
         self.position_history = None
@@ -197,6 +198,9 @@ class FWLateralNPFG(gym.Env):
     def step(self, action: np.ndarray):
         # Action info caching
         self._action = action
+
+        # Advance vehicle time
+        self._vehicle_time += self.dt
         
         # State retrieval
         position = self.state[0:2]  # position
@@ -293,6 +297,7 @@ class FWLateralNPFG(gym.Env):
 
         # Reset Statistics
         self.position_history = None
+        self._vehicle_time = 0.0
 
         if self.render_mode == "human":
             self.render()
@@ -404,8 +409,9 @@ class FWLateralNPFG(gym.Env):
 
         # Draw debug info
         debug_text = ''
-        current_time = pygame.time.get_ticks() / 1000.
-        debug_text += ('T: {} '.format(current_time))
+        # current_time = pygame.time.get_ticks() / 1000.
+        current_time = self._vehicle_time
+        debug_text += ('T: {:.2f} '.format(current_time))
         if self._action is not None:
             lat_accel_cmd = self._action[1]
             debug_text += ('Acc: {:.1f} '.format(lat_accel_cmd))
