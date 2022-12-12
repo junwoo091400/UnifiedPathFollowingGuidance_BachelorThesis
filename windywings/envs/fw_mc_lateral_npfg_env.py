@@ -218,7 +218,7 @@ class FWMCLateralNPFG(gym.Env):
         self.position_history = None
 
         # GYM internal variables
-        self._action = None # Cache of the latest `action` command applied in `step` functino
+        self._action = [0.0, 0.0] # Cache of the latest `action` command applied in `step` functinon
         
         # Action space
         self.action_space = Box(
@@ -469,7 +469,19 @@ class FWMCLateralNPFG(gym.Env):
                 print(e)
                 print('Path start: {}, Path end: {}'.format(path_start_pos, path_end_pos))
 
-        # Draw resulting action commands (Interpretation of the `action` in `step` function!)
+        # Draw raw `action` inputs (assumed to be in Body frame, which isn't really correct)
+        ACTION_SCALER = 10.0 # Scaling factor of the acceleration visualization
+        raw_action_3d = np.array([self._action[0], self._action[1], 0.0])
+        rot = Rotation.from_euler('z', vehicle_yaw)
+        action_global = rot.apply(raw_action_3d)[0:2] # Acceleration command in body frame
+        pygame.draw.line(self.surf, pygame.Color('yellow'), vehicle_pos, vehicle_pos + action_global * self.world_to_screen_scaling * ACTION_SCALER) # Manually scale the vector
+
+        # Draw resulting accelerations (Interpretation of the `action` in `step` function!)
+        ACCEL_SCALER = 20.0 # Scaling factor of the acceleration visualization
+        raw_accel_cmd_3d = np.array([self.longitudinal_acceleration, self.lateral_acceleration, 0.0])
+        rot = Rotation.from_euler('z', vehicle_yaw)
+        accel_cmd_global = rot.apply(raw_accel_cmd_3d)[0:2] # Acceleration command in body frame
+        pygame.draw.line(self.surf, pygame.Color('black'), vehicle_pos, vehicle_pos + accel_cmd_global * self.world_to_screen_scaling * ACCEL_SCALER) # Manually scale the vector
 
         # Draw NPFG internal calculations
         # Closest point on path (connect with vehicle)
