@@ -41,21 +41,27 @@ class Environments(unittest.TestCase):
     def __init__(self):
         # NPFG Test Environment
         screen_width, screen_height = 600, 600
-        world_size = 200.0 # Size of the simulated world (e.g. Width) in meters (will be scaled to screen internally)
+        world_size = 400.0 # Size of the simulated world (e.g. Width) in meters (will be scaled to screen internally)
         DEBUG_ENABLE = True
+
+        # Runtime user settings
+        self._stop_every_1_sec = False
 
         # World size of 200 means that it's a 200 m x 200 m space that vehicle can fly in
         self.env = gym.make('fixedwing-lateral-npfg', world_size = world_size, screen_size = [screen_width, screen_height], render_mode='human', DEBUG = DEBUG_ENABLE)
 
         # Initial state setting
-        # PosX: 0, PosY: 0, Speed: 15, Heading: 0
-        # PathX: 0, PathY: 0, PathHeading: PI/4, PathCurvature: 0
-        posX = -world_size/2 # Start at leftmost side
-        posY = 0.0
+        posX = -world_size/2
+        posY = world_size/4
+        vehicle_speed = 20.0
+        vehicle_heading = 0.0
+
+        pathX = 0.0
+        pathY = 0.0
         path_heading = 0#np.pi/4
         path_curvature = 0.0#0.01
 
-        initial_state = np.array([posX, posY, 15.0, 0.0, 0.0, 0.0, path_heading, path_curvature], dtype=np.float32)
+        initial_state = np.array([posX, posY, vehicle_speed, vehicle_heading, pathX, pathY, path_heading, path_curvature], dtype=np.float32)
         
         self.env.reset(initial_state=initial_state)
 
@@ -63,8 +69,11 @@ class Environments(unittest.TestCase):
         ''' Executes the simulation'''
         start_t=timer()
 
-        # Render FPS is 100, so 400 will result in 4.00 seconds simulation time.
-        for i,_ in enumerate(range(400)): #dt=0.01, 400*0.01=4s
+        # NOTE: Vehicle dynamics dt is 0.03 seconds, and FPS rendering in Pygame is 100 FPS == 0.01 seconds
+        # Therefore, the vehicle will travel 3 times faster than it *actually is, this lowers simulation time.
+        sim_time_secs = 7.0
+
+        for i,_ in enumerate(range(int(sim_time_secs / 0.01))):
 
             # Calculate NPFG logic
             action = self.env.control()
@@ -72,11 +81,16 @@ class Environments(unittest.TestCase):
             # Take a setp in simulation
             obs, reward, done, _ = self.env.step(action)
 
+            # Take a snapshot & analyze
+            if self._stop_every_1_sec:
+                if i != 0 and i%100 == 0:
+                    input('Input key to simulate 1 second further')
+
             if(done):
                 env.reset()
 
         end_t=timer()
-        print("simulation time=",end_t-start_t)
+        print("Actual simulation time=",end_t-start_t)
 
         # Wait for user input (to give time for screen capture)
         input('Waiting for user ...')
