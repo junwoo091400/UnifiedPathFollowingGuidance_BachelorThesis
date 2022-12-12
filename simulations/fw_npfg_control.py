@@ -52,8 +52,8 @@ class Environments(unittest.TestCase):
         # PathX: 0, PathY: 0, PathHeading: PI/4, PathCurvature: 0
         posX = -world_size/2 # Start at leftmost side
         posY = 0.0
-        path_heading = np.pi/4
-        path_curvature = 0
+        path_heading = 0#np.pi/4
+        path_curvature = 0.0#0.01
 
         initial_state = np.array([posX, posY, 15.0, 0.0, 0.0, 0.0, path_heading, path_curvature], dtype=np.float32)
         
@@ -63,6 +63,7 @@ class Environments(unittest.TestCase):
         ''' Executes the simulation'''
         start_t=timer()
 
+        # Render FPS is 100, so 400 will result in 4.00 seconds simulation time.
         for i,_ in enumerate(range(400)): #dt=0.01, 400*0.01=4s
 
             # Calculate NPFG logic

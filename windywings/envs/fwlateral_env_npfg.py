@@ -336,6 +336,7 @@ class FWLateralNPFG(gym.Env):
                 self.screen = pygame.display.set_mode(
                     (self.screen_width, self.screen_height)
                 )
+                pygame.display.set_caption('Fixed Wing Lateral Acc NPFG Environment')
             else:  # mode == "rgb_array":
                 self.screen = pygame.Surface(
                     (self.screen_width, self.screen_height))
@@ -397,8 +398,21 @@ class FWLateralNPFG(gym.Env):
                 print(e)
                 print('Path start: {}, Path end: {}'.format(path_start_pos, path_end_pos))
 
+        # Drawing the diagram & flipping Y axis
         self.surf = pygame.transform.flip(self.surf, False, True) # Flips the surface drawing in Y-axis, so that frame coordinate wise, X is RIGHT, Y is UP in the visualization
         self.screen.blit(self.surf, (0, 0))
+
+        # Draw debug info
+        debug_text = ''
+        current_time = pygame.time.get_ticks() / 1000.
+        debug_text += ('T: {} '.format(current_time))
+        if self._action is not None:
+            lat_accel_cmd = self._action[1]
+            debug_text += ('Acc: {:.1f} '.format(lat_accel_cmd))
+
+        debug_font = pygame.font.SysFont(None, 24)
+        debug_img = debug_font.render(debug_text, True, (0, 0, 0))
+        self.screen.blit(debug_img, (0, 0))
 
         if self.render_mode == "human":
             pygame.event.pump()
