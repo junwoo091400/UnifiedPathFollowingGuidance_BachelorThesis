@@ -415,10 +415,16 @@ class FWLateralNPFG(gym.Env):
         # Closest point on path (connect with vehicle)
         closest_point_on_path = self.world2screen(self._npfg.d_closest_point_on_path)
         pygame.draw.line(self.surf, pygame.Color('grey'), vehicle_pos, closest_point_on_path)
+        # Unit path tangent vector
         UPT_LENGTH = 20 # Multiplier on the length of the unit path tangent vector to draw
         pygame.draw.line(self.surf, pygame.Color('green'), closest_point_on_path, closest_point_on_path + self._npfg.d_unit_path_tangent * self.world_to_screen_scaling * UPT_LENGTH) # Manually scale the vector
+        # Track error bound
         TRACK_ERROR_BOUND_WIDTH = 1 # Thickness of the circle visualizing track error bound
         pygame.draw.circle(self.surf, pygame.Color('purple'), closest_point_on_path, self._npfg.d_track_error_bound * self.world_to_screen_scaling, width=TRACK_ERROR_BOUND_WIDTH) # Set width, to not fill the circle
+        # Bearing setpoint from look-ahead-angle
+        BEARING_LENGTH = 60 # Multiplier on the length of the unit path tangent vector to draw
+        BEARING_WIDTH = 3
+        pygame.draw.line(self.surf, pygame.Color('pink'), vehicle_pos, vehicle_pos + self._npfg.d_bearing_vector * self.world_to_screen_scaling * BEARING_LENGTH, width=BEARING_WIDTH) # Manually scale the vector
 
         # Drawing the diagram & flipping Y axis
         self.surf = pygame.transform.flip(self.surf, False, True) # Flips the surface drawing in Y-axis, so that frame coordinate wise, X is RIGHT, Y is UP in the visualization
@@ -432,7 +438,11 @@ class FWLateralNPFG(gym.Env):
         if self._action is not None:
             lat_accel_cmd = self._action[1]
             debug_text += ('Acc: {:.1f} '.format(lat_accel_cmd))
+        debug_text += 'tE: {:.1f} m '.format(self._npfg.d_signed_track_error)
         debug_text += 'te: {:.2f} '.format(self._npfg.d_normalized_track_error)
+        debug_text += 'tp: {:.2f} '.format(self._npfg.d_track_proximity)
+        debug_text += 'at: {:.2f} '.format(self._npfg.d_lateral_accel_no_curve)
+        debug_text += 'ac: {:.2f} '.format(self._npfg.d_lateral_accel_ff_curve)
 
         debug_font = pygame.font.SysFont(None, 24)
         debug_img = debug_font.render(debug_text, True, (0, 0, 0))
