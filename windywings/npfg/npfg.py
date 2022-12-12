@@ -88,7 +88,7 @@ class NPFG:
         if (signed_track_error > 0):
             # When POSITIVE, it means Vehicle is on the left side of the path
             # Bearing vector is UPT turned clockwise by (PI/2 - LAA), which is -Z rotation
-            rot = Rotation.from_euler('z', -(np.pi - look_ahead_angle))
+            rot = Rotation.from_euler('z', -(np.pi/2 - look_ahead_angle))
             unit_path_tangent_3d = np.array([unit_path_tangent[0], unit_path_tangent[1], 0.0])
             rotated = rot.apply(unit_path_tangent_3d)
             # Return the 2D coordinates of the rotated 3D vector
@@ -96,7 +96,7 @@ class NPFG:
         else:
             # When NEGATIVE, it means Vehicle is on the right side of the path
             # Bearing vector is UPT turned counter-clockwise by (PI/2 - LAA), which is +Z rotation
-            rot = Rotation.from_euler('z', (np.pi - look_ahead_angle))
+            rot = Rotation.from_euler('z', (np.pi/2 - look_ahead_angle))
             unit_path_tangent_3d = np.array([unit_path_tangent[0], unit_path_tangent[1], 0.0])
             rotated = rot.apply(unit_path_tangent_3d)
             # Return the 2D coordinates of the rotated 3D vector
