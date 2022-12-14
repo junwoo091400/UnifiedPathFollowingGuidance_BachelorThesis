@@ -435,7 +435,9 @@ class FWMCLateralNPFG(gym.Env):
 
         # State retrieval
         vehicle_pos = self.world2screen(self.state[0:2])
+        longitudinal_speed = self.state[2]
         vehicle_yaw = self.state[3]
+        lateral_speed = self.state[8]
 
         # Draw Position History
         if (self.position_history is not None) and (self.position_history.shape[0] > 1):
@@ -551,6 +553,8 @@ class FWMCLateralNPFG(gym.Env):
         debug_text += 'ac: {:+.1f} '.format(self._npfg.d_lateral_accel_ff_curve)
         debug_text += 'Ax: {:+.1f} '.format(self.longitudinal_acceleration)
         debug_text += 'Ay: {:+.1f} '.format(self.lateral_acceleration)
+        debug_text += 'Vx: {:+.1f} '.format(longitudinal_speed)
+        debug_text += 'Vy: {:+.1f} '.format(lateral_speed)
 
         debug_font = pygame.font.SysFont(None, 24)
         debug_img = debug_font.render(debug_text, True, (0, 0, 0))
