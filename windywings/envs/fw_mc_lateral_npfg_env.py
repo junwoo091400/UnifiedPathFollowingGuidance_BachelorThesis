@@ -540,17 +540,17 @@ class FWMCLateralNPFG(gym.Env):
         debug_text = ''
         # current_time = pygame.time.get_ticks() / 1000.
         current_time = self._sim_time
-        debug_text += ('T: {:.2f} '.format(current_time))
+        debug_text += ('T: {:4.2f} '.format(current_time))
         if self._action is not None:
             lat_accel_cmd = self._action[1]
-            debug_text += ('Acc: {:.1f} '.format(lat_accel_cmd))
-        debug_text += 'tE: {:.1f} m '.format(self._npfg.d_signed_track_error)
-        debug_text += 'te: {:.2f} '.format(self._npfg.d_normalized_track_error)
-        debug_text += 'tp: {:.2f} '.format(self._npfg.d_track_proximity)
-        debug_text += 'at: {:.2f} '.format(self._npfg.d_lateral_accel_no_curve)
-        debug_text += 'ac: {:.2f} '.format(self._npfg.d_lateral_accel_ff_curve)
-        debug_text += 'Ax: {:.1f} '.format(self.longitudinal_acceleration)
-        debug_text += 'Ay: {:.1f} '.format(self.lateral_acceleration)
+            debug_text += ('Acc: {:+.1f} '.format(lat_accel_cmd))
+        debug_text += 'tE: {:+3.1f} m '.format(self._npfg.d_signed_track_error)
+        debug_text += 'te: {:2.2f} '.format(self._npfg.d_normalized_track_error)
+        debug_text += 'tp: {:2.2f} '.format(self._npfg.d_track_proximity)
+        debug_text += 'at: {:+.1f} '.format(self._npfg.d_lateral_accel_no_curve)
+        debug_text += 'ac: {:+.1f} '.format(self._npfg.d_lateral_accel_ff_curve)
+        debug_text += 'Ax: {:+.1f} '.format(self.longitudinal_acceleration)
+        debug_text += 'Ay: {:+.1f} '.format(self.lateral_acceleration)
 
         debug_font = pygame.font.SysFont(None, 24)
         debug_img = debug_font.render(debug_text, True, (0, 0, 0))
