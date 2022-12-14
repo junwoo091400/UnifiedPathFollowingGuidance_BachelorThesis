@@ -149,6 +149,7 @@ class FWMCLateralNPFG(gym.Env):
         self.screen = None
         self.clock = None
         self.isopen = True
+        self.accel_render_scaling = 5.0 # Scaling factor on how to interpret 1m/s^2 in the meter-unit on screen
 
         # Vehicle dynamic configuration parameters
         if vehicle_type == 'multicopter':
@@ -321,15 +322,19 @@ class FWMCLateralNPFG(gym.Env):
         ''' Return the control `action` vector with current vehicle state. Handles calculation using NPFG logic '''
         # Retrieve state vector info
         position = self.state[0:2]  # position
-        speed = self.state[2]
+        longitudinal_speed = self.state[2]
         heading = self.state[3]
         path_pos = self.state[4:6]
         path_bearing = self.state[6]
         path_curvature = self.state[7]
+        lateral_speed = self.state[8]
 
         # Additional calculations
         path_unit_tangent_vector = np.array([np.cos(path_bearing), np.sin(path_bearing)])
-        ground_vel = speed * np.array([np.cos(heading), np.sin(heading)])
+        
+        # Complete ground vel in global frame including longitudinal AND lateral velocity!
+        ground_vel = longitudinal_speed * np.array([np.math.cos(heading), np.math.sin(heading)]) + lateral_speed * np.array([-np.math.sin(heading), np.math.cos(heading)])
+        # ground_vel = speed * np.array([np.cos(heading), np.sin(heading)])
 
         # NPFG logic
         lateral_acc_cmd = self._npfg.navigatePathTangent_nowind(position, path_pos, path_unit_tangent_vector, ground_vel, path_curvature)
@@ -393,6 +398,7 @@ class FWMCLateralNPFG(gym.Env):
         try:
             import pygame
             from pygame import gfxdraw
+            from pygame.locals import Rect
 
         except ImportError:
             raise DependencyNotInstalled(
@@ -469,21 +475,7 @@ class FWMCLateralNPFG(gym.Env):
                 print(e)
                 print('Path start: {}, Path end: {}'.format(path_start_pos, path_end_pos))
 
-        # Draw raw `action` inputs (assumed to be in Body frame, which isn't really correct)
-        ACTION_SCALER = 10.0 # Scaling factor of the acceleration visualization
-        raw_action_3d = np.array([self._action[0], self._action[1], 0.0])
-        rot = Rotation.from_euler('z', vehicle_yaw)
-        action_global = rot.apply(raw_action_3d)[0:2] # Acceleration command in body frame
-        pygame.draw.line(self.surf, pygame.Color('yellow'), vehicle_pos, vehicle_pos + action_global * self.world_to_screen_scaling * ACTION_SCALER) # Manually scale the vector
-
-        # Draw resulting accelerations (Interpretation of the `action` in `step` function!)
-        ACCEL_SCALER = 20.0 # Scaling factor of the acceleration visualization
-        raw_accel_cmd_3d = np.array([self.longitudinal_acceleration, self.lateral_acceleration, 0.0])
-        rot = Rotation.from_euler('z', vehicle_yaw)
-        accel_cmd_global = rot.apply(raw_accel_cmd_3d)[0:2] # Acceleration command in body frame
-        pygame.draw.line(self.surf, pygame.Color('black'), vehicle_pos, vehicle_pos + accel_cmd_global * self.world_to_screen_scaling * ACCEL_SCALER) # Manually scale the vector
-
-        # Draw NPFG internal calculations
+        ## Draw NPFG internal calculations
         # Closest point on path (connect with vehicle)
         closest_point_on_path = self.world2screen(self._npfg.d_closest_point_on_path)
         pygame.draw.line(self.surf, pygame.Color('grey'), vehicle_pos, closest_point_on_path)
@@ -497,8 +489,50 @@ class FWMCLateralNPFG(gym.Env):
         BEARING_LENGTH = 60 # Multiplier on the length of the unit path tangent vector to draw
         BEARING_WIDTH = 3
         pygame.draw.line(self.surf, pygame.Color('pink'), vehicle_pos, vehicle_pos + self._npfg.d_bearing_vector * self.world_to_screen_scaling * BEARING_LENGTH, width=BEARING_WIDTH) # Manually scale the vector
+        # Draw resulting accelerations (Interpretation of the `action` in `step` function!)
+        ACCEL_SCALER = self.accel_render_scaling# 20.0 # Scaling factor of the acceleration visualization
+        raw_accel_cmd_3d = np.array([self.longitudinal_acceleration, self.lateral_acceleration, 0.0])
+        rot = Rotation.from_euler('z', vehicle_yaw)
+        accel_cmd_global = rot.apply(raw_accel_cmd_3d)[0:2] # Acceleration command in body frame
+        pygame.draw.line(self.surf, pygame.Color('black'), vehicle_pos, vehicle_pos + accel_cmd_global * self.world_to_screen_scaling * ACCEL_SCALER) # Manually scale the vector
 
-        # Drawing the diagram & flipping Y axis
+        # Draw extra debug info, focused on the vehicle, magnified.
+        VEHICLE_FOCUSED_CENTER = np.array([self.screen_width*3/4, self.screen_height*1/8])
+        VEHICLE_FOCUSED_WIDTH_HEIGHT = np.array([self.screen_width//4, self.screen_width//4])
+        VEHICLE_FOCUSED_RECT_LEFT_TOP = VEHICLE_FOCUSED_CENTER - VEHICLE_FOCUSED_WIDTH_HEIGHT/2
+        # Draw the magnified view boundary: https://pygame.readthedocs.io/en/latest/rect/rect.html
+        vehicle_focused_rect = Rect(VEHICLE_FOCUSED_RECT_LEFT_TOP, VEHICLE_FOCUSED_WIDTH_HEIGHT)
+        pygame.draw.rect(self.surf, color=pygame.Color('black'), rect=vehicle_focused_rect, width=1)
+        # Draw the Vehicle
+        r, t, b = carlength, 0.5 * carwidth, -0.5 * carwidth
+        coords = []
+        for c in [(0, t), (0, b), (r, 0)]:
+            c = pygame.math.Vector2(c).rotate_rad(vehicle_yaw)
+            coords.append(
+                (
+                    c[0] + VEHICLE_FOCUSED_CENTER[0],
+                    c[1] + VEHICLE_FOCUSED_CENTER[1]
+                )
+            )
+        gfxdraw.aapolygon(self.surf, coords, (0, 0, 0))
+        gfxdraw.filled_polygon(self.surf, coords, (0, 0, 0))
+
+        # Draw raw `action` inputs (assumed to be in Body frame, which isn't really correct)
+        ACTION_SCALER = self.accel_render_scaling#10.0 # Scaling factor of the acceleration visualization
+        raw_action_3d = np.array([self._action[0], self._action[1], 0.0])
+        rot: Rotation = Rotation.from_euler('z', vehicle_yaw)
+        action_global = rot.apply(raw_action_3d)[0:2] # Acceleration command in body frame
+        pygame.draw.line(self.surf, pygame.Color('cornflowerblue'), VEHICLE_FOCUSED_CENTER, VEHICLE_FOCUSED_CENTER + action_global * self.world_to_screen_scaling * ACTION_SCALER, width=2) # Manually scale the vector
+        
+        # Draw resulting accelerations (Interpretation of the `action` in `step` function!)
+        ACCEL_SCALER = self.accel_render_scaling#20.0 # Scaling factor of the acceleration visualization
+        raw_accel_cmd_3d = np.array([self.longitudinal_acceleration, self.lateral_acceleration, 0.0])
+        rot = Rotation.from_euler('z', vehicle_yaw)
+        accel_cmd_global = rot.apply(raw_accel_cmd_3d)[0:2] # Acceleration command in body frame
+        pygame.draw.line(self.surf, pygame.Color('black'), VEHICLE_FOCUSED_CENTER, VEHICLE_FOCUSED_CENTER + accel_cmd_global * self.world_to_screen_scaling * ACCEL_SCALER) # Manually scale the vector
+
+        # print(action_global, 'vs', accel_cmd_global)
+
         self.surf = pygame.transform.flip(self.surf, False, True) # Flips the surface drawing in Y-axis, so that frame coordinate wise, X is RIGHT, Y is UP in the visualization
         self.screen.blit(self.surf, (0, 0))
 
