@@ -136,7 +136,7 @@ class FWMCLateralNPFG(gym.Env):
         "render_fps": 100,
     }
 
-    def __init__(self, screen_size = [1200, 1200], world_size = 100.0, vehicle_type: Optional[str] = 'fixedwing', render_mode: Optional[str] = None, DEBUG = False):
+    def __init__(self, screen_size = [1200, 1200], world_size = 100.0, vehicle_type: Optional[str] = 'fixedwing', render_mode: Optional[str] = None, DEBUG = False, nominal_airspeed = None, reference_airspeed = None):
         """ Initialize the Environment (Screen size: Actual display size, World size: size of the world that will be self.world_to_screen_scalingd & projected onto the screen) """
         assert len(screen_size) == 2, "Screen size [Width, Height] not an array with length 2!"
         assert world_size > 0, "World size (width & height) must be a positive number!"
@@ -174,9 +174,18 @@ class FWMCLateralNPFG(gym.Env):
             self.min_lateral_speed = -50.0
             self.min_lateral_acceleration = -10.0 # Sane lateral accel limit
             self.max_lateral_acceleration = 10.0 # Sane lateral accel limit
+            
             # these are specifically for verbosely setting NPFG parameters
-            self.airspeed_nom = 15.0
-            self.airspeed_ref = 0.1 # NOTE: This can be set for 0 for multicopters, which can achieve 0 forward speed!
+            if nominal_airspeed is not None:
+                self.airspeed_nom = nominal_airspeed
+            else:
+                self.airspeed_nom = 15.0
+
+            if reference_airspeed is not None:
+                self.airspeed_ref = reference_airspeed
+            else:
+                # NOTE: This can be set for 0 for multicopters, which can achieve 0 forward speed!
+                self.airspeed_ref = 0.1
         else:
             # Fixedwing constraints
             self.max_longitudinal_speed = 50.0
@@ -186,10 +195,19 @@ class FWMCLateralNPFG(gym.Env):
             self.max_lateral_speed = 0.0
             self.min_lateral_speed = 0.0
             self.min_lateral_acceleration = -10.0 # Sane lateral accel limit
-            self.max_lateral_acceleration = 10.0 # Sane lateral accel limit
+            self.max_lateral_acceleration = 10.0 # Sane lateral accel 
+            
             # these are specifically for verbosely setting NPFG parameters
-            self.airspeed_nom = 15.0
-            self.airspeed_ref = 15.0 #NOTE: FW doesn't suffer from oscillations when airspeed ref is set close to 0 (e.g. 0.1)
+            if nominal_airspeed is not None:
+                self.airspeed_nom = nominal_airspeed
+            else:
+                self.airspeed_nom = 15.0
+
+            if reference_airspeed is not None:
+                self.airspeed_ref = reference_airspeed
+            else:
+                # NOTE: This can be set for 0 for multicopters, which can achieve 0 forward speed!
+                self.airspeed_ref = 15.0
 
         # State: PosX, PosY, V_longitudinal, Heading, PathX, PathY, PathHeading, PathCurvature, V_lateral
         self.low_state = np.array(
@@ -539,6 +557,7 @@ class FWMCLateralNPFG(gym.Env):
         self.screen.blit(self.surf, (0, 0))
 
         # Draw debug info
+        # Debug panel 1
         debug_text = ''
         # current_time = pygame.time.get_ticks() / 1000.
         current_time = self._sim_time
@@ -555,10 +574,17 @@ class FWMCLateralNPFG(gym.Env):
         debug_text += 'Ay: {:+.1f} '.format(self.lateral_acceleration)
         debug_text += 'Vx: {:+.1f} '.format(longitudinal_speed)
         debug_text += 'Vy: {:+.1f} '.format(lateral_speed)
-
         debug_font = pygame.font.SysFont(None, 24)
         debug_img = debug_font.render(debug_text, True, (0, 0, 0))
         self.screen.blit(debug_img, (0, 0))
+
+        # Debug panel 2
+        debug_text = ''
+        debug_text += 'Vnom: {:2.1f} '.format(self.airspeed_nom)
+        debug_text += 'Vref: {:2.1f} '.format(self.airspeed_ref)
+        debug_font = pygame.font.SysFont(None, 24)
+        debug_img = debug_font.render(debug_text, True, (0, 0, 0))
+        self.screen.blit(debug_img, (0, self.screen_height*0.9)) # Place it lower-left
 
         if self.render_mode == "human":
             pygame.event.pump()
