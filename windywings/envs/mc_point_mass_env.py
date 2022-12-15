@@ -164,12 +164,12 @@ class MCPointMass(gym.Env):
             low=self.min_state, high=self.max_state, shape=STATE_SPACE_SHAPE
         )
     
-    def decode_state(self):
+    def decode_state(self, state):
         """ Decodes the state into discrete values """
-        assert np.shape(self.state) == STATE_SPACE_SHAPE
-        pos = self.state[0:2]
-        vel = self.state[2:4]
-        acc = self.state[4:6]
+        assert np.shape(state) == STATE_SPACE_SHAPE
+        pos = state[0:2]
+        vel = state[2:4]
+        acc = state[4:6]
         
         return (pos, vel, acc)
 
@@ -184,7 +184,7 @@ class MCPointMass(gym.Env):
     def step(self, action: np.ndarray):
         assert(np.shape(action) == ACTION_SPACE_SHAPE)
 
-        pos, vel, acc = self.decode_state()
+        pos, vel, acc = self.decode_state(self.state)
         vel_sp, acc_ff = self.decode_action(action)
 
         # Integrate state
@@ -216,6 +216,8 @@ class MCPointMass(gym.Env):
         
         assert np.shape(initial_state) == STATE_SPACE_SHAPE
         self.state = initial_state
+
+        print('Reset: State set to:', self.state)
         
         return (self._get_obs(), self._get_info())
 
