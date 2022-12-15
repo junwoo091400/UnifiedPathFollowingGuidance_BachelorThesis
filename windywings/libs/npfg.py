@@ -14,8 +14,11 @@ Author: Junwoo Hwang (junwoo091400@gmail.com)
 import numpy as np
 from scipy.spatial.transform import Rotation
 
+AIRSPEED_NOM_DEFAULT = 15.0 # [m/s] Default nominal airspeed in NPFG
+AIRSPEED_MAX_DEFAULT = 25.0 # [m/s] Default maximum airspeed in NPFG
+
 class NPFG:
-    def __init__(self, airspeed_nom = 15.0):
+    def __init__(self, airspeed_nom = AIRSPEED_NOM_DEFAULT, airspeed_max = AIRSPEED_MAX_DEFAULT):
         ''' Initialize NPFG library with vehicle specific parameters '''
         # Parameters (constant)
         self.track_error_bound_ground_speed_cutoff = 1.0 # [m/s] Ground speed cutoff under which track error bound forms a quadratic function that saturates at speed = 0.
@@ -28,8 +31,8 @@ class NPFG:
         self.time_const = 7.071 # Time constant for ground speed based track error bound calculation. Equals period * damping,
         self.p_gain = 0.8885 # [rad/s] Proportional game, computed from period and damping
         self.airspeed_nom = airspeed_nom # [m/s] Nominal (desired) airspeed refernece, a.k.a cruise optimized airspeed
-        self.airspeed_max = self.airspeed_nom * 1.5 # [m/s] Maximum airspeed vehicle can achieve
-        self.min_ground_speed = 1.0 # [m/s] Minimum ground speed to keep at all times
+        self.airspeed_max = airspeed_max # [m/s] Maximum airspeed vehicle can achieve
+        self.min_ground_speed = 5.0 # [m/s] Minimum ground speed to keep at all times
         self.max_min_ground_speed_track_keeping = 5.0 # [m/s] Maximum 'minimum ground speed' track keeping feature can command (grows linearly with track error)
 
         # Internal Variables for Runtime calculation (needed for implementation details)
@@ -113,6 +116,7 @@ class NPFG:
             else:
                 return -self.p_gain * air_speed
         else:
+            print('NPFG:LateralAccel: p_gain:{}, air_vel_ref_crossed:{}, air speed ref:{}'.format(self.p_gain, air_vel_error_crossed, air_speed_ref))
             return self.p_gain * air_vel_error_crossed / air_speed_ref
 
     def refAirVelocity(self, bearing_vector, min_ground_speed_ref = 0.0):
@@ -131,6 +135,7 @@ class NPFG:
 
         elif airspeed_min > self.airspeed_nom:
             # Feasible range between nominal speed ~ maximum speed
+            print('NPFG:refAirVelocity: Minimum air speed is above nominal speed! Airspeed min:', airspeed_min)
             return airspeed_min * bearing_vector
 
         else:
