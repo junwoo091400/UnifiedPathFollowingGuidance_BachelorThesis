@@ -20,15 +20,21 @@ class NPFG:
         # Parameters (constant)
         self.track_error_bound_ground_speed_cutoff = 1.0 # [m/s] Ground speed cutoff under which track error bound forms a quadratic function that saturates at speed = 0.
         self.min_radius = 0.5 # [m] Minimum effective radius. For Path curvature compensating lateral accel calculation (MIN_RADIUS)
+        self.normalized_track_error_bound_for_maximum_track_keeping = 0.5 # When normalized track error reaches this boundary, track keeping will command full authority on minimum ground speed (TODO:Why is this really needed? Having it to 1.0 won't push the vehicle *enough to the path in excess wind?)
 
-        # Parameters (user-adjustable)
+        # Parameters (user-adjustable). TODO: Remove magic numbers
         self.period = 10.0 # [s] Nominal desired period
         self.damping = 0.7071 # Nominal desired damping ratio
         self.time_const = 7.071 # Time constant for ground speed based track error bound calculation. Equals period * damping,
         self.p_gain = 0.8885 # [rad/s] Proportional game, computed from period and damping
         self.airspeed_nom = airspeed_nom # [m/s] Nominal (desired) airspeed refernece, a.k.a cruise optimized airspeed
+        self.airspeed_max = self.airspeed_nom * 1.5 # [m/s] Maximum airspeed vehicle can achieve
+        self.min_ground_speed = 1.0 # [m/s] Minimum ground speed to keep at all times
+        self.max_min_ground_speed_track_keeping = 5.0 # [m/s] Maximum 'minimum ground speed' track keeping feature can command (grows linearly with track error)
 
         # Internal Variables for Runtime calculation (needed for implementation details)
+        self.air_vel_ref = np.array([0.0, 0.0]) # [m/s] Air velocity reference command generated
+        self.accel_ff_curve = np.array([0.0, 0.0]) # [m/s^2] Feed-forward acceleration command for following the curvature of the path
 
         # Internal Variables for debugging only! (Should not be 'read' internally)
         self.d_position_error_vec = np.array([0.0, 0.0])
@@ -39,9 +45,7 @@ class NPFG:
         self.d_look_ahead_angle_from_track_error = 0.0
         self.d_track_proximity = 0.0
         self.d_bearing_vector = np.array([1.0, 0.0])
-        self.d_air_vel_ref = np.array([15.0, 0.0])
         self.d_lateral_accel_no_curve = 0.0
-        self.d_lateral_accel_ff_curve = 0.0
         self.d_closest_point_on_path = np.array([0.0, 0.0])
 
     def trackErrorBound(self, ground_speed, time_constant):
@@ -69,13 +73,6 @@ class NPFG:
     def trackProximity(self, look_ahead_ang):
         """ Calculates track proximity (0 when at track error boundary, 1 when on track) """
         return np.square(np.sin(look_ahead_ang))
-
-    """
-    def rotate2DVector(self, vec, angle_rad):
-        ''' Helper function that rotates `vec` in XY plane by `angle_rad` in Z-axis '''
-        # https://www.rollpie.com/post/311
-        # NOTE: The SciPy already has this implemented: https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.transform.Rotation.html
-    """
 
     def bearingVec(self, unit_path_tangent, look_ahead_angle, signed_track_error):
         """ Calculate bearing setpoint based on look ahead angle, varying between unit_path_tangent (UPT) and a track error vector (which is orthogonal to UPT) """
@@ -105,6 +102,7 @@ class NPFG:
         assert np.shape(air_velocity_reference) == (2, )
 
         air_speed = np.linalg.norm(air_velocity)
+        air_speed_ref = np.linalg.norm(air_velocity_reference)
         air_vel_error_dot = np.dot(air_velocity, air_velocity_reference)
         air_vel_error_crossed = np.cross(air_velocity, air_velocity_reference)
 
@@ -115,15 +113,37 @@ class NPFG:
             else:
                 return -self.p_gain * air_speed
         else:
-            return self.p_gain * air_vel_error_crossed / self.air_speed
+            return self.p_gain * air_vel_error_crossed / air_speed_ref
 
-    def refAirVelocity(self, bearing_vector, min_ground_speed_ref = None):
+    def refAirVelocity(self, bearing_vector, min_ground_speed_ref = 0.0):
         ''' Calculate reference (target) airmass-relative velocity, corresponding to the bearing vector '''
         assert np.shape(bearing_vector) == (2, )
         # NOTE: This is the crucial function that handles track keeping feature, etc.
         # Since we assume no wind, bearing is always feasible. Just return airspeed vector in bearing vector direction
-        # NOTE: Didn't implement the function in full (regarding min ground speed), just using nominal airpeed user setting
-        return self.airspeed_nom * bearing_vector
+
+        # We are always in a condition to respect minimum ground speed / track keeping
+        airspeed_min = min_ground_speed_ref # Since there's no wind, minimum airspeed required is equal to minimum ground speed
+
+        if airspeed_min > self.airspeed_max:
+            # Infeasible airspeed setting
+            # Since there's no wind and bearing is always feasible, directly calculate max vel in bearing setpoint direction
+            return self.airspeed_max * bearing_vector
+
+        elif airspeed_min > self.airspeed_nom:
+            # Feasible range between nominal speed ~ maximum speed
+            return airspeed_min * bearing_vector
+
+        else:
+            # Definitely achievable airspeed (low)
+            return self.airspeed_nom * bearing_vector
+
+    def minGroundSpeed(self, normalized_track_error, feasibility_combined):
+        ''' Calculate minimum ground speed setpoint, depending on track error / user set minimum ground speed '''
+        assert (feasibility_combined <= 1.0 and feasibility_combined >= 0.0)
+        assert (normalized_track_error <= 1.0 and normalized_track_error >= 0.0)
+
+        min_gsp_track_keeping = (1.0 - feasibility_combined) * self.max_min_ground_speed_track_keeping * np.clip(normalized_track_error/self.normalized_track_error_bound_for_maximum_track_keeping, 0.0, 1.0)
+        return max(self.min_ground_speed, min_gsp_track_keeping) # Set minimum bound to user set min ground speed
 
     def lateralAccelFF(self, unit_path_tangent, ground_velocity, air_speed, signed_track_error, path_curvature):
         ''' Calculates additional lateral acceleration for path curvature '''
@@ -138,11 +158,28 @@ class NPFG:
         tangent_ground_speed = max(np.dot(ground_velocity, unit_path_tangent), 0) # Clip minimum value at 0 m/s
         path_frame_rate = path_frame_curvature * tangent_ground_speed
         speed_ratio = 1.0 # ALWAYS 1.0, TODO: Verify if this is a sane value
+        accel_ff_magnitude = air_speed * speed_ratio * path_frame_rate
 
-        return air_speed * speed_ratio * path_frame_rate
+        # Since it is to follow a curve, it is orthogonal to unit path tangent
+        # With curvature > 0, it is counter-clockwise turn, hence rotation of PI/2 from unit path tangent
+        rot = Rotation.from_euler('z', (np.pi/2))
+        unit_path_tangent_3d = np.array([unit_path_tangent[0], unit_path_tangent[1], 0.0])
+        unit_path_tangent_orthogonal = rot.apply(unit_path_tangent_3d)[0:2]
+                
+        return accel_ff_magnitude * unit_path_tangent_orthogonal
+
+    def getAirVelRef(self):
+        ''' Air velocity reference vector (desired air-velocity) '''
+        assert np.shape(self.air_vel_ref) == (2,)
+        return self.air_vel_ref
+
+    def getAccelFFCurvature(self):
+        ''' Acceleration Feed-forward term required for following path curvature '''
+        assert np.shape(self.accel_ff_curve) == (2,)
+        return self.accel_ff_curve
 
     def guideToPath_nowind(self, ground_vel, unit_path_tangent, signed_track_error, curvature):
-        ''' Compute the lateral acceleration and airspeed reference to guide to specified path (wind is not considered) '''
+        ''' Compute the lateral acceleration and airspeed reference to guide to specified path for fixed-wing (unicyclic motion vehicles) (wind is not considered) '''
         # Assert input variable shapes
         assert np.shape(ground_vel) == (2, ), "Ground Velocity shape isn't (2, )!"
         assert np.shape(unit_path_tangent) == (2, ), "Unit Path Tangent shape isn't (2, )!"
@@ -162,12 +199,13 @@ class NPFG:
         look_ahead_ang = self.lookAheadAngle(normalized_track_error) # LAA solely based on track proximity (normalized)
         track_proximity = self.trackProximity(look_ahead_ang)
         bearing_vector = self.bearingVec(unit_path_tangent, look_ahead_ang, signed_track_error)
-        feas_combined = 1.0 # With no wind, feasibility is 1.0 (on track feas) * 1.0 (with wind)
-        air_vel_ref = self.refAirVelocity(bearing_vector)
+        feas_combined = 1.0 # With no wind, feasibility is 1.0 (on track feas) * 1.0 (current position feas)
+        minimum_groundspeed_reference = self.minGroundSpeed(normalized_track_error, feas_combined)
+        self.air_vel_ref = self.refAirVelocity(bearing_vector, minimum_groundspeed_reference)
 
         # OUTPUT
-        lateral_accel = self.lateralAccel(air_vel, air_vel_ref)
-        lateral_accel_curve = self.lateralAccelFF(unit_path_tangent, ground_vel, air_speed, signed_track_error, curvature)
+        lateral_accel = self.lateralAccel(air_vel, self.air_vel_ref)
+        self.accel_ff_curve = self.lateralAccelFF(unit_path_tangent, ground_vel, air_speed, signed_track_error, curvature)
 
         # Debug values
         self.d_track_error_bound = track_error_bound
@@ -175,11 +213,9 @@ class NPFG:
         self.d_look_ahead_angle_from_track_error = look_ahead_ang
         self.d_track_proximity = track_proximity
         self.d_bearing_vector = bearing_vector
-        self.d_air_vel_ref = air_vel_ref
         self.d_lateral_accel_no_curve = lateral_accel
-        self.d_lateral_accel_ff_curve = lateral_accel_curve
 
-        return lateral_accel + feas_combined * track_proximity * lateral_accel_curve
+        return lateral_accel + feas_combined * track_proximity * np.linalg.norm(self.accel_ff_curve)
 
     def navigatePathTangent_nowind(self, vehicle_pos, position_setpoint, tangent_setpoint, ground_vel, curvature):
         ''' Follow the line path specified by position, path tangent & curvature. Acts as a proxy to the `guidetoPath` function '''
