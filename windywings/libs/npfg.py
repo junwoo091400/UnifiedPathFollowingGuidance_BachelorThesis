@@ -15,7 +15,7 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 
 class NPFG:
-    def __init__(self, airspeed_nom = 15.0, airspeed_ref = 15.0):
+    def __init__(self, airspeed_nom = 15.0):
         ''' Initialize NPFG library with vehicle specific parameters '''
         # Parameters (constant)
         self.track_error_bound_ground_speed_cutoff = 1.0 # [m/s] Ground speed cutoff under which track error bound forms a quadratic function that saturates at speed = 0.
@@ -27,9 +27,6 @@ class NPFG:
         self.time_const = 7.071 # Time constant for ground speed based track error bound calculation. Equals period * damping,
         self.p_gain = 0.8885 # [rad/s] Proportional game, computed from period and damping
         self.airspeed_nom = airspeed_nom # [m/s] Nominal (desired) airspeed refernece, a.k.a cruise optimized airspeed
-
-        # Internal State (that is formulated in the paper)
-        self.airspeed_ref = airspeed_ref # [m/s] Airspeed reference
 
         # Internal Variables for Runtime calculation (needed for implementation details)
 
@@ -118,7 +115,7 @@ class NPFG:
             else:
                 return -self.p_gain * air_speed
         else:
-            return self.p_gain * air_vel_error_crossed / self.airspeed_ref
+            return self.p_gain * air_vel_error_crossed / self.air_speed
 
     def refAirVelocity(self, bearing_vector, min_ground_speed_ref = None):
         ''' Calculate reference (target) airmass-relative velocity, corresponding to the bearing vector '''

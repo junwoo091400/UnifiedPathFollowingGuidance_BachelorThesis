@@ -51,7 +51,7 @@ from matplotlib.animation import FuncAnimation
 from scipy.spatial.transform import Rotation
 
 # Dirty import of NPFG library
-from windywings.npfg.npfg import NPFG
+from windywings.libs.npfg import NPFG
 
 # Dirty copy of FWLateral to accompany NPFG details (e.g. Path info)
 class FWMCLateralNPFG(gym.Env):
