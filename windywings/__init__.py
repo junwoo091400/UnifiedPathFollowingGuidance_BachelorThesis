@@ -13,3 +13,8 @@ register(
     id='multicopter-fixedwing-lateral-npfg', 
     entry_point='windywings.envs:FWMCLateralNPFG'
 )
+
+register(
+    id='multicopter-pointmass',
+    entry_point='windywings.envs:MCPointMass'
+)
