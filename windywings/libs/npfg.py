@@ -24,6 +24,7 @@ class NPFG:
         self.track_error_bound_ground_speed_cutoff = 1.0 # [m/s] Ground speed cutoff under which track error bound forms a quadratic function that saturates at speed = 0.
         self.min_radius = 0.5 # [m] Minimum effective radius. For Path curvature compensating lateral accel calculation (MIN_RADIUS)
         self.normalized_track_error_bound_for_maximum_track_keeping = 0.5 # When normalized track error reaches this boundary, track keeping will command full authority on minimum ground speed (TODO:Why is this really needed? Having it to 1.0 won't push the vehicle *enough to the path in excess wind?)
+        self.airspeed_buffer_for_bearing_feasibility = 1.5 # [m/s] Airspeed buffer, which is the size of the feasibility transition region at bearing & wind angle >= 90 deg.
 
         # Parameters (user-adjustable). TODO: Remove magic numbers
         self.period = 10.0 # [s] Nominal desired period
@@ -65,6 +66,28 @@ class NPFG:
             return ground_speed * time_constant
         else:
             return 0.5 * time_constant * (np.square(ground_speed) + track_error_saturation_val)
+
+    def bearingFeasibility(self, wind_vec: np.ndarray, bearing_rad, airspeed):
+        ''' Calculate continuous bearing feasibility with given wind vector (relative to unit path tangent) & current vehicle airspeed '''
+        # NOTE: Originnal code relies on having 4 inputs, but I reduced it to 3 inputs by using vector for wind velocity
+        assert self.airspeed_buffer_for_bearing_feasibility > 0.0
+        assert np.shape(wind_vec) == (2,), "Wind vector isn't 2D! Shape of {} = {}".format(wind_vec, np.shape(wind_vec))
+
+        wind_speed = np.linalg.norm(wind_vec)
+        assert wind_speed >= 0.0
+
+        bearing_vec = np.array([np.cos(bearing_rad), np.sin(bearing_rad)])
+        wind_dot_bearing = np.dot(wind_vec, bearing_vec)
+        wind_cross_bearing = np.cross(wind_vec, bearing_vec)
+
+        if (wind_dot_bearing < 0.0):
+            wind_cross_bearing = wind_speed
+        else:
+            wind_cross_bearing = abs(wind_cross_bearing)
+
+        sin_val = np.sin(0.5*np.pi*np.clip((airspeed - wind_cross_bearing)/self.airspeed_buffer_for_bearing_feasibility, 0.0, 1.0))
+
+        return np.square(sin_val)
 
     def lookAheadAngle(self, normalized_track_error):
         """ Look Ahead Angle (angle which bearing setpoint vector deviates from unit track error vector) soley based on normalized track error """
@@ -194,7 +217,7 @@ class NPFG:
         ground_speed = np.linalg.norm(ground_vel)
         air_vel = ground_vel # Airmass relative velocity equals ground vel with no wind
         air_speed = np.linalg.norm(air_vel)
-        feas_on_track = 1.0 # Bearing feasiblity always 1.0 with no wind
+        feas_on_track = self.bearingFeasibility(0.0, 0.0, air_speed, 0.0) # Bearing feasibility in unit path tangent direction. Wind velocity set to 0.0
         track_error = abs(signed_track_error)
         # skip `adaptPeriod`, `pGain` and `timeConst` function calls
 
@@ -204,7 +227,8 @@ class NPFG:
         look_ahead_ang = self.lookAheadAngle(normalized_track_error) # LAA solely based on track proximity (normalized)
         track_proximity = self.trackProximity(look_ahead_ang)
         bearing_vector = self.bearingVec(unit_path_tangent, look_ahead_ang, signed_track_error)
-        feas_combined = 1.0 # With no wind, feasibility is 1.0 (on track feas) * 1.0 (current position feas)
+        feas_current = self.bearingFeasibility(0.0, 0.0, air_speed, 0.0) # Bearing feasibility of the ref bearing vector. Wind velocity = 0.0.
+        feas_combined = feas_on_track * feas_current
         minimum_groundspeed_reference = self.minGroundSpeed(normalized_track_error, feas_combined)
         self.air_vel_ref = self.refAirVelocity(bearing_vector, minimum_groundspeed_reference)
 
@@ -244,5 +268,3 @@ class NPFG:
         self.d_signed_track_error = signed_track_error
 
         return self.guideToPath_nowind(ground_vel, unit_path_tangent, signed_track_error, curvature)
-
-        
