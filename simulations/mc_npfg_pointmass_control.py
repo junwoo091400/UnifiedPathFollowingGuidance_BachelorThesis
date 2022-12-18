@@ -61,6 +61,7 @@ class MC_npfg_pointmass(unittest.TestCase):
         self.screen = None
         self.clock = None
         self.world_to_screen_scaling = np.max(SCREEN_SIZE_DEFAULT)/world_size # NOTE: Assume our screen will be default.
+        self.position_history = None
 
     def test_env(self):
         ''' Executes the simulation'''
@@ -133,6 +134,16 @@ class MC_npfg_pointmass(unittest.TestCase):
 
         # Decode observation to get current vehicle state
         pos, vel, acc = self.env.decode_state(self.observation)
+
+        # Draw vehicle path
+        if self.position_history is not None:
+            self.position_history = np.concatenate((self.position_history, [pos]), axis=0)
+        else:
+            self.position_history = np.array([pos])
+
+        if (self.position_history is not None) and (self.position_history.shape[0] > 1):
+            xys = list(zip(map(self.world2screen, self.position_history)))
+            pygame.draw.aalines(self.surf, points=xys, closed=False, color=(120, 120, 255))
 
         # Draw the Vehicle
         pygame.draw.circle(self.surf, pygame.color.Color('black'), self.world2screen(pos), MULTICOPTER_CIRCLE_RADIUS)
