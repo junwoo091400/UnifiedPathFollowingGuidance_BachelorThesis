@@ -5,6 +5,5 @@ setup(
     packages=["windywings"],
     install_requires=['gym[classic_control]',
                       'numpy',
-                      'matplotlib',
-                      'torch']
+                      'matplotlib']
 )
