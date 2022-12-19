@@ -48,12 +48,19 @@ from gym.error import DependencyNotInstalled
 from windywings.logger.default_logger import Logger
 from matplotlib import pyplot as plt
 
+# Helper constants to do assertions. Make sure this matches the description below!
+ACTION_SPACE_SHAPE = (2,)
+STATE_SPACE_SHAPE = (4,)
+
+# Default vehicle constraints
+AIRSPEED_MIN_DEFAULT = 5.0
+AIRSPEED_MAX_DEFAULT = 15.0
 
 class FWLateral(gym.Env):
     """
     # Description
 
-    Environment to simulate fixed wing longitudinal dynamics
+    Environment to simulate fixed wing lateral dynamics
 
     # Observation Space
 
@@ -61,10 +68,10 @@ class FWLateral(gym.Env):
 
     | Num | Observation                          | Min  | Max | Unit           |
     |-----|--------------------------------------|------|-----|----------------|
-    | 0   | Position of the plane (x)            | -Inf | Inf | position (m)   |
-    | 1   | Position of the plane (y)            | -Inf | Inf | position (m)   |
-    | 2   | Speed of the plane (x)               | 0.0  | Inf | velocity (m/s) |
-    | 3   | Heading of the plane (rad)           | -PI  | PI  | rad            |
+    | 0   | Position of the plane, global frame (x)            | -Inf | Inf | position (m)   |
+    | 1   | Position of the plane, global frame (y)            | -Inf | Inf | position (m)   |
+    | 2   | Speed of the plane, body frame (x)               | 0.0  | Inf | velocity (m/s) |
+    | 3   | Heading of the plane, global frame (rad)           | -PI  | PI  | rad            |
 
     # Action Space
 
@@ -72,251 +79,144 @@ class FWLateral(gym.Env):
 
     | Num | Action                               | Min  | Max | Unit           |
     |-----|--------------------------------------|------|-----|----------------|
-    | 0   | Longitudial acceleration             | 0    | 1   | m / s^2        |
-    | 1   | Yaw rate                             | -1   | 1   | rad / s        |
+    | 0   | Airspeed setpoint, body frame (x)             | 0    | Inf   | m / s       |
+    | 1   | Yaw rate setpoint, body frame (z)          | -Inf   | Inf   | rad / s        |
 
     # Transition Dynamics:
 
     Given an action, the plane is following transition dynamics:
 
-    *position<sub>t+1</sub> = position<sub>t</sub> + velocity<sub>t+1</sub> * dt*
+    Position += Speed * [cos(heading), sin(heading)] * dt
 
-    *velocity<sub>t+1</sub> = velocity<sub>t</sub> + throttle (cos(heading<sub>t</sub>), sin(heading<sub>t</sub>))* dt*
+    Acceleration_feedback = P_gain * (Airspeed_setpoint - Airspeed)
+    Acceleration = Acceleration_feedback
+    Airspeed += Acceleration * dt
 
-    where force is the action clipped to the range `[-1,1]` and power is a constant 0.0015.
-    The collisions at either end are inelastic with the velocity set to 0 upon collision with the wall.
-    The position is clipped to the range [-1.2, 0.6] and velocity is clipped to the range [-0.07, 0.07].
-
-    # Reward
-
+    Heading += Yawrate_setpoint * dt
 
     # Starting State
 
-    The position of the plane is assigned a uniform random value in `[0.0. , 0.0]`.
-    The starting velocity of the plane is always assigned to `[15.0. , 0.0]`.
-
-    # Episode End
-
-    The episode ends if either of the following happens:
-    1. Termination: The position of the car is greater than or equal to 0.45 (the goal position on top of the right hill)
-    2. Truncation: The length of the episode is 999.
-
-    # Arguments
+    If not specified, the plane starts at (-world_size/2, 0), the left-most point of the environment.
+    With the velocity of (max_airspeed/2, 0)
 
     ```
-    gym.make('fixedwing-longituninal')
-    ```
-
-    # Version History
-
-    * v0: Initial versions release (1.0.0)
+    gym.make('fixedwing-lateral')
     """
-
-    metadata = {
-        "render_modes": ["human", "rgb_array"],
-        "render_fps": 100,
-    }
-
-    def __init__(self, render_mode: Optional[str] = None, goal_velocity=0):
-        """ Initialize the Environment """
-        # Open AI Gym related parameters (rendering)
-        self.render_mode = render_mode
-        self.screen_width = 600
-        self.screen_height = 600
-        self.screen = None
-        self.clock = None
-        self.isopen = True
-
-        # Vehicle dynamic configuration parameters
-        self.dt = 0.03
-        self.min_action = -1.0
-        self.max_action = 1.0
-        self.min_position = -100.0
-        self.max_position = 100.0
-        self.max_speed = 50.0
-        self.min_speed = 0.0
-        self.max_acceleration = 1.0
-        self.gravity = np.array([0.0, -9.81])
-        self.low_state = np.array(
-            [self.min_position, self.min_position, self.min_speed, self.min_speed, -3.14, -100.0], dtype=np.float32
-        )
-        self.high_state = np.array(
-            [self.max_position, self.max_position, self.max_speed, self.max_speed, 3.14, 100.0], dtype=np.float32
-        )
-
-        # Vehicle state (Pos X, Pos Y, Ground Speed, Heading)
-        # self.state = np.array([0, 0, 10.0, 0.0], dtype=np.float32)
-
-        # Runtime variables (not part of state, but used for calculations)
-        self.acceleration = 0.0
-
-        # Statistics
-        ##TODO: Hack! Initialize position history properly
-        self.position_history = [[0.0, 0.0]]
-        self.position_history = np.append(self.position_history, [[0.0, 1.0]], axis=0)
-
-        # GYM internal variables
-        
-        # Action space
-        self.action_space = Box(
-            low=self.min_action, high=self.max_action, shape=(1,), dtype=np.float32
-        )
-
-        # Observation space
-        self.observation_space = Dict(
-            {
-                "Vehicle": Dict(
-                    {
-                        "Position": Box(low=self.min_position, high=self.max_position, shape=(2,)),
-                        "Speed": Box(low=self.min_speed, high=self.max_speed, shape=(1,))
-                    }
-                )
-            }
-        )
-
-    def step(self, action: np.ndarray):
-        position = self.state[0:2]  # position
-        velocity = self.state[2]    # velocity
-        heading = self.state[3]     # heading
-
-        acceleration_cmd = action[0]
-        yawrate_cmd = action[1]
-
-        self.acceleration = self.max_acceleration * acceleration_cmd
-
-        position = position + velocity * np.array([np.math.cos(heading), np.math.sin(heading)]) * self.dt
-        velocity = velocity + self.acceleration * self.dt
-        heading = heading + yawrate_cmd * self.dt
-
-        # Convert a possible numpy bool to a Python bool.
-        terminated = bool(
-            velocity <= 0.0
-        )
-
-        reward = 0
-        if terminated:
-            reward = 0.0
-        reward -= math.pow(action[0], 2) * 0.1
-
-        self.state = np.array([position[0], position[1], velocity, heading], dtype=np.float32)
-        self.position_history = np.append(self.position_history, [[position[0], position[1]]], axis=0)
-
-        if self.render_mode == "human":
-            self.render()
-
-        # Observation, Reward, Done, Info: https://www.gymlibrary.dev/content/environment_creation/#step
-        return self._get_obs(), reward, terminated, self._get_info()
 
     def _get_obs(self):
         """ Get Observation from internal state """
-        position = self.state[0:2]
-        # Note: since 'speed' observation space is defined in (1, ) shape, the speed component
-        # needs to be converted into the list first, before turning into an np.array, to not have
-        # "The obs returned by the `reset()` method is not within the observation space" error.
-        # E.g. Without bracket: "array(15., dtype=float32)", With bracket: "array([15.], dtype=float32)"
-        speed = np.array([self.state[2]])
-        return {"Vehicle": {"Position": position, "Speed": speed}}
+        return self.state
 
     def _get_info(self):
         """ Get Information from internal state """
-        return {'linX': self.acceleration, 'linY': 0.0, 'angZ': 0.0}
+        return { }
+
+    def _is_terminated(self):
+        """ Get Termination state from internal state """
+
+    def __init__(self, render_mode: Optional[str] = None, world_size = 200.0, airspeed_bounds = np.array([AIRSPEED_MIN_DEFAULT, AIRSPEED_MAX_DEFAULT]), yawrate_bounds = np.array([-1.0, 1.0]), acceleration_bounds = np.array([-1.0, 1.0])):
+        """ Initialize the Environment """
+        self.dt = 0.03
+        self.world_size = world_size
+        self.min_position, self.max_position = -world_size/2, world_size/2
+        self.min_airspeed, self.max_airspeed = airspeed_bounds
+        self.min_acceleration,self.max_acceleration = acceleration_bounds
+        self.min_yawrate, self.max_yawrate = yawrate_bounds
+
+        # Airspeed controller
+        self.p_airspeed = 1.0
+
+        # Action space
+        self.min_action = np.array(
+            [self.min_airspeed, self.min_yawrate]
+        )
+        self.max_action = np.array(
+            [self.max_airspeed, self.max_yawrate]
+        )
+        self.action_space = Box(
+            low=self.min_action, high=self.max_action, shape=ACTION_SPACE_SHAPE
+        )
+
+        # Observation space (equals state space)
+        self.min_state = np.array(
+            [self.min_position, self.min_position, self.min_airspeed, self.min_yawrate]
+        )
+        self.max_state = np.array(
+            [self.max_position, self.max_position, self.max_airspeed, self.max_yawrate]
+        )
+        self.observation_space = Box(
+            low=self.min_state, high=self.max_state, shape=STATE_SPACE_SHAPE
+        )
+    
+    def decode_state(self, state):
+        """ Decodes the state into discrete values """
+        assert np.shape(state) == STATE_SPACE_SHAPE
+        pos = state[0:2]
+        airspeed = state[2]
+        heading = state[3]
+        
+        return (pos, airspeed, heading)
+
+    def decode_action(self, action=np.ndarray):
+        ''' Decode action into discrete values. '''
+        assert np.shape(action) == ACTION_SPACE_SHAPE
+        airspeed_sp = action[0]
+        yawrate_sp = action[1]
+        
+        return (airspeed_sp, yawrate_sp)
+
+    def step(self, action: np.ndarray):
+        assert(np.shape(action) == ACTION_SPACE_SHAPE)
+
+        pos, airspeed, heading = self.decode_state(self.state)
+        airspeed_sp, yawrate_sp = self.decode_action(action)
+
+        # Integrate state
+        pos += airspeed * np.array([np.cos(heading), np.sin(heading)]) * self.dt
+
+        # Apply P-control on airspeed
+        acc_fb = (airspeed_sp - airspeed) * self.p_airspeed
+        airspeed += acc_fb * self.dt
+
+        # Apply yawrate control on heading
+        heading += yawrate_sp * self.dt
+
+        # Set new state
+        self.state = np.concatenate((pos, airspeed, heading), axis=None)
+
+        assert np.shape(self.state) == STATE_SPACE_SHAPE
+
+        # Observation, Reward, Done, Info: https://www.gymlibrary.dev/content/environment_creation/#step
+        return self._get_obs(), 0.0, self._is_terminated(), self._get_info()
+
 
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None,
-              initial_state: Optional[np.ndarray] = [0.0, 0.0, 15.0, 0.0, 0.0, 0.0]):
+              initial_state: Optional[np.ndarray] = None):
+        ''' Reset the environment '''
         super().reset(seed=seed)
-        # Note that if you use custom reset bounds, it may lead to out-of-bound
-        # state/observations.
-        low, high = utils.maybe_parse_reset_bounds(options, -0.6, -0.4)
-        self.state = np.array(initial_state, dtype=np.float32)
 
-        if self.render_mode == "human":
-            self.render()
+        if (not isinstance(initial_state, np.ndarray)):
+            # If not specified, initialize as described in the description
+            initial_pos = np.array([-self.world_size/2, 0.0])
+            initial_airspeed = np.array([self.max_airspeed/2])
+            initial_heading = np.array([0.0])
+            initial_state = np.concatenate((initial_pos, initial_airspeed, initial_heading), axis=None)
+        
+        assert np.shape(initial_state) == STATE_SPACE_SHAPE
+        self.state = initial_state
+
+        print('Reset: State set to:', self.state)
         
         return (self._get_obs(), self._get_info())
-
-    def _height(self, xs):
-        return 0.0 * xs
-
+    
     def render(self):
-        if self.render_mode is None:
-            gym.logger.warn(
-                "You are calling render method without specifying any render mode. "
-                "You can specify the render_mode at initialization, "
-                f'e.g. gym("{self.spec.id}", render_mode="rgb_array")'
-            )
-            return
+        """ Render function not implemented """
+        return None
 
-        try:
-            import pygame
-            from pygame import gfxdraw
-
-        except ImportError:
-            raise DependencyNotInstalled(
-                "pygame is not installed, run `pip install gym[classic_control]`"
-            )
-
-        if self.screen is None:
-            pygame.init()
-            if self.render_mode == "human":
-                pygame.display.init()
-                self.screen = pygame.display.set_mode(
-                    (self.screen_width, self.screen_height)
-                )
-            else:  # mode == "rgb_array":
-                self.screen = pygame.Surface(
-                    (self.screen_width, self.screen_height))
-        if self.clock is None:
-            self.clock = pygame.time.Clock()
-
-        world_width = self.max_position - self.min_position
-        scale = self.screen_width / world_width
-        carlength = 20
-        carwidth = 10
-
-        self.surf = pygame.Surface((self.screen_width, self.screen_height))
-        self.surf.fill((255, 255, 255))
-
-        pos = np.array([self.state[0], self.state[1]])
-        yaw = self.state[3]
-
-        clearance = 200
-        if self.position_history.shape[1] > 1:
-            xys = list(zip((self.position_history[:, 0] + 50.0) * scale, self.position_history[:, 1] * scale + clearance))
-            pygame.draw.aalines(self.surf, points=xys, closed=False, color=(120, 120, 255))
-
-        r, t, b = carlength, 0.5 * carwidth, -0.5 * carwidth
-        coords = []
-        for c in [(0, t), (0, b), (r, 0)]:
-            c = pygame.math.Vector2(c).rotate_rad(yaw)
-            coords.append(
-                (
-                    c[0] + (pos[0] + 50.0) * scale,
-                    c[1] + clearance + pos[1] * scale,
-                )
-            )
-
-        gfxdraw.aapolygon(self.surf, coords, (0, 0, 0))
-        gfxdraw.filled_polygon(self.surf, coords, (0, 0, 0))
-
-        self.surf = pygame.transform.flip(self.surf, False, True)
-        self.screen.blit(self.surf, (0, 0))
-        if self.render_mode == "human":
-            pygame.event.pump()
-            self.clock.tick(self.metadata["render_fps"])
-            pygame.display.flip()
-
-        elif self.render_mode == "rgb_array":
-            return np.transpose(
-                np.array(pygame.surfarray.pixels3d(self.screen)), axes=(1, 0, 2)
-            )
-
-    def control():
-        return
+    def control(self):
+        """ Control function not implemented """
+        return None
 
     def close(self):
-        if self.screen is not None:
-            import pygame
-
-            pygame.display.quit()
-            pygame.quit()
-            self.isopen = False
+        """ Close function not implemented """
+        return None
