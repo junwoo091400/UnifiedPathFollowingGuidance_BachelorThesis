@@ -139,7 +139,7 @@ class NPFG:
             else:
                 return -self.p_gain * air_speed
         else:
-            print('NPFG:LateralAccel: p_gain:{}, air_vel_ref_crossed:{}, air speed ref:{}'.format(self.p_gain, air_vel_error_crossed, air_speed_ref))
+            # print('NPFG:LateralAccel: p_gain:{}, air_vel_ref_crossed:{}, air speed ref:{}'.format(self.p_gain, air_vel_error_crossed, air_speed_ref))
             return self.p_gain * air_vel_error_crossed / air_speed_ref
 
     def refAirVelocity(self, bearing_vector, min_ground_speed_ref = 0.0):
@@ -158,7 +158,6 @@ class NPFG:
 
         elif airspeed_min > self.airspeed_nom:
             # Feasible range between nominal speed ~ maximum speed
-            print('NPFG:refAirVelocity: Minimum air speed is above nominal speed! Airspeed min:', airspeed_min)
             return airspeed_min * bearing_vector
 
         else:
@@ -213,11 +212,14 @@ class NPFG:
         assert np.shape(unit_path_tangent) == (2, ), "Unit Path Tangent shape isn't (2, )!"
         assert curvature >= 0, "Path curvature value is negative!"
 
-        # VAR setup
+        # Constants
+        NO_WIND_VECTOR = np.array([0.0, 0.0])
+
+        # Variables setup
         ground_speed = np.linalg.norm(ground_vel)
         air_vel = ground_vel # Airmass relative velocity equals ground vel with no wind
         air_speed = np.linalg.norm(air_vel)
-        feas_on_track = self.bearingFeasibility(0.0, 0.0, air_speed, 0.0) # Bearing feasibility in unit path tangent direction. Wind velocity set to 0.0
+        feas_on_track = self.bearingFeasibility(NO_WIND_VECTOR, np.arctan2(unit_path_tangent[1], unit_path_tangent[0]), air_speed) # Bearing feasibility in unit path tangent direction. Wind velocity set to 0.0
         track_error = abs(signed_track_error)
         # skip `adaptPeriod`, `pGain` and `timeConst` function calls
 
@@ -227,9 +229,10 @@ class NPFG:
         look_ahead_ang = self.lookAheadAngle(normalized_track_error) # LAA solely based on track proximity (normalized)
         track_proximity = self.trackProximity(look_ahead_ang)
         bearing_vector = self.bearingVec(unit_path_tangent, look_ahead_ang, signed_track_error)
-        feas_current = self.bearingFeasibility(0.0, 0.0, air_speed, 0.0) # Bearing feasibility of the ref bearing vector. Wind velocity = 0.0.
+        feas_current = self.bearingFeasibility(NO_WIND_VECTOR, np.arctan2(bearing_vector[1], bearing_vector[0]), air_speed) # Bearing feasibility of the ref bearing vector. Wind velocity = 0.0.
         feas_combined = feas_on_track * feas_current
         minimum_groundspeed_reference = self.minGroundSpeed(normalized_track_error, feas_combined)
+        print('Feas combined: {}, Min groundspeed:{}'.format(feas_combined, minimum_groundspeed_reference))
         self.air_vel_ref = self.refAirVelocity(bearing_vector, minimum_groundspeed_reference)
 
         # OUTPUT
