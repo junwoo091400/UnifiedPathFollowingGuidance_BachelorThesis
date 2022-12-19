@@ -123,7 +123,7 @@ class NPFG:
             return rotated[0:2]
 
     def lateralAccel(self, air_velocity, air_velocity_reference):
-        ''' Calculates lateral acceleration based on heading error '''
+        ''' Calculates lateral acceleration based on course error. Resulting accelerationg is a scalar value, applied orthogonal to air_velocity vector '''
         assert np.shape(air_velocity) == (2, )
         assert np.shape(air_velocity_reference) == (2, )
 
@@ -173,7 +173,7 @@ class NPFG:
         return max(self.min_ground_speed, min_gsp_track_keeping) # Set minimum bound to user set min ground speed
 
     def lateralAccelFF(self, unit_path_tangent, ground_velocity, air_speed, signed_track_error, path_curvature):
-        ''' Calculates additional lateral acceleration for path curvature '''
+        ''' Calculates additional lateral acceleration for path curvature (scalar) '''
         # NOTE: Calculation is done as if vehicle is at the path setpoint with 0 error, and having to follow the path curvature!
         assert np.shape(unit_path_tangent) == (2, )
         assert np.shape(ground_velocity) == (2, )
@@ -189,11 +189,11 @@ class NPFG:
 
         # Since it is to follow a curve, it is orthogonal to unit path tangent
         # With curvature > 0, it is counter-clockwise turn, hence rotation of PI/2 from unit path tangent
-        rot = Rotation.from_euler('z', (np.pi/2))
-        unit_path_tangent_3d = np.array([unit_path_tangent[0], unit_path_tangent[1], 0.0])
-        unit_path_tangent_orthogonal = rot.apply(unit_path_tangent_3d)[0:2]
+        # rot = Rotation.from_euler('z', (np.pi/2))
+        # unit_path_tangent_3d = np.array([unit_path_tangent[0], unit_path_tangent[1], 0.0])
+        # unit_path_tangent_orthogonal = rot.apply(unit_path_tangent_3d)[0:2]
                 
-        return accel_ff_magnitude * unit_path_tangent_orthogonal
+        return accel_ff_magnitude
 
     def getAirVelRef(self):
         ''' Air velocity reference vector (desired air-velocity) '''
@@ -202,7 +202,7 @@ class NPFG:
 
     def getAccelFFCurvature(self):
         ''' Acceleration Feed-forward term required for following path curvature '''
-        assert np.shape(self.accel_ff_curve) == (2,)
+        assert np.isscalar(self.accel_ff_curve)
         return self.accel_ff_curve
 
     def guideToPath_nowind(self, ground_vel, unit_path_tangent, signed_track_error, curvature):
@@ -232,12 +232,16 @@ class NPFG:
         feas_current = self.bearingFeasibility(NO_WIND_VECTOR, np.arctan2(bearing_vector[1], bearing_vector[0]), air_speed) # Bearing feasibility of the ref bearing vector. Wind velocity = 0.0.
         feas_combined = feas_on_track * feas_current
         minimum_groundspeed_reference = self.minGroundSpeed(normalized_track_error, feas_combined)
-        print('Feas combined: {}, Min groundspeed:{}'.format(feas_combined, minimum_groundspeed_reference))
         self.air_vel_ref = self.refAirVelocity(bearing_vector, minimum_groundspeed_reference)
+
+        # Debug output
+        print('Feas combined: {}, Min groundspeed:{}'.format(feas_combined, minimum_groundspeed_reference))
 
         # OUTPUT
         lateral_accel = self.lateralAccel(air_vel, self.air_vel_ref)
         self.accel_ff_curve = self.lateralAccelFF(unit_path_tangent, ground_vel, air_speed, signed_track_error, curvature)
+        assert np.isscalar(lateral_accel)
+        assert np.isscalar(self.accel_ff_curve)
 
         # Debug values
         self.d_track_error_bound = track_error_bound
@@ -247,7 +251,7 @@ class NPFG:
         self.d_bearing_vector = bearing_vector
         self.d_lateral_accel_no_curve = lateral_accel
 
-        return lateral_accel + feas_combined * track_proximity * np.linalg.norm(self.accel_ff_curve)
+        return lateral_accel + feas_combined * track_proximity * self.accel_ff_curve
 
     def navigatePathTangent_nowind(self, vehicle_pos, position_setpoint, tangent_setpoint, ground_vel, curvature):
         ''' Follow the line path specified by position, path tangent & curvature. Acts as a proxy to the `guidetoPath` function '''
