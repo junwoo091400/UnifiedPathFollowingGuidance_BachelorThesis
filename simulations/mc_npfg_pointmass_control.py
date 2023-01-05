@@ -12,14 +12,14 @@ import gym
 from windywings.libs.npfg import NPFG
 
 # Rendering
-SCREEN_SIZE_DEFAULT = (1200, 1200) # Default screen size for rendering
+SCREEN_SIZE_DEFAULT = (600, 600) # Default screen size for rendering
 MULTICOPTER_CIRCLE_RADIUS = 10 # Radius of the circle representing vehicle in rendering
 
 # Environment constraints
 NOM_VELOCITY = 0.0
 MAX_VELOCITY = 15.0
 MAX_ACCELERATION = 10.0
-WORLD_SIZE_DEFAULT = 300.0 # [m] Default simulated world size
+WORLD_SIZE_DEFAULT = 100.0 # [m] Default simulated world size
 PATH_BEARING_DEG_DEFAULT = 0.0
 PATH_CURVATURE_DEFAULT = 0.0
 
@@ -42,6 +42,9 @@ class MC_npfg_pointmass(unittest.TestCase):
 
         # NPFG
         self.npfg = NPFG(nominal_airspeed, MAX_VELOCITY) # NOTE: Max velocity is fixed to this constant, so if nominal velocity is set higher by user, it will be capped!! (Currently 0.0, so doesn't matter)
+        self.npfg.min_ground_speed = 0.0 # For pure track-keeping feature, user-set min ground speed msut be 0.0!
+
+        # Path setting
         self.path_bearing = np.deg2rad(path_bearing_deg)
         self.path_unit_tangent_vec = np.array([np.cos(self.path_bearing), np.sin(self.path_bearing)])
         self.path_curvature = path_curvature
@@ -85,8 +88,9 @@ class MC_npfg_pointmass(unittest.TestCase):
             # Render
             self.render()
 
-            # Debug
-            print('Pos', pos, 'Vel', vel, 'Vel ref', self.air_vel_ref, 'Acc FF', self.acc_ff_curvature)
+            # Debug (every 30 frames)
+            if (i % 30 == 0):
+                print('Pos', pos, 'Vel', vel, 'Vel ref', self.air_vel_ref, 'Acc FF', self.acc_ff_curvature)
 
             # Take a snapshot & analyze
             if self._stop_every_1_sec:
@@ -97,10 +101,10 @@ class MC_npfg_pointmass(unittest.TestCase):
                 env.reset()
 
         end_t=timer()
-        print("Actual simulation time=",end_t-start_t)
+        print("Simulated time={}s, Computation time={}s".format(SIM_DURATION_SEC, (end_t-start_t)))
 
-        # Wait for user input (to give time for screen capture)
-        input('Waiting for user ...')
+        # Handle simulation termination
+        self.handle_simulation_termination()
 
     def world2screen(self, coords: np.array):
         ''' Converts the world coordinate (in meters) to a pixel location in Rendering screen '''
@@ -165,8 +169,18 @@ class MC_npfg_pointmass(unittest.TestCase):
         self.surf = pygame.transform.flip(self.surf, False, True) # Flips the surface drawing in Y-axis, so that frame coordinate wise, X is RIGHT, Y is UP in the visualization
         self.screen.blit(self.surf, (0, 0))
         pygame.event.pump()
-        self.clock.tick(1/SIM_TIME_DT)
+        # self.clock.tick(1/SIM_TIME_DT) # Remove clock ticking to reduce simulation time.
         pygame.display.flip()
+
+    def handle_simulation_termination(self):
+        ''' Waits for the user to press Escape (ESC) key, and until then keeps pumping the pygame (to prevent 'not responding' error) '''
+        print('Press ESC to exit the simulation')
+        while True:
+            pygame.event.pump()
+            keys = pygame.key.get_pressed()
+            if keys[pygame.K_ESCAPE]:
+                break
+        print('Exiting the simulation ...')
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser('Multicopter NPFG Control Simulation')
