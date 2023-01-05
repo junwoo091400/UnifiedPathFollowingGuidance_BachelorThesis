@@ -238,7 +238,7 @@ class NPFG:
         self.air_vel_ref = self.refAirVelocity(bearing_vector, minimum_groundspeed_reference)
 
         # Debug output
-        print('Feas combined: {}, Min groundspeed:{}'.format(feas_combined, minimum_groundspeed_reference))
+        # print('Feas combined: {:.2f}, Normalized Track error: {:.2f}, Min groundspeed:{:.1f}'.format(feas_combined, normalized_track_error, minimum_groundspeed_reference))
 
         # OUTPUT
         lateral_accel = self.lateralAccel(air_vel, self.air_vel_ref)
