@@ -6,7 +6,6 @@ from typing import Optional
 from timeit import default_timer as timer
 import numpy as np
 import argparse
-from gooey import Gooey
 
 import pygame
 import gym
@@ -169,20 +168,16 @@ class MC_npfg_pointmass(unittest.TestCase):
         self.clock.tick(1/SIM_TIME_DT)
         pygame.display.flip()
 
-@Gooey
-def main():
+if __name__ == "__main__":
     parser = argparse.ArgumentParser('Multicopter NPFG Control Simulation')
     parser.add_argument('--debug', action='store_true', help='Enable debug printout in the Environment')
     parser.add_argument('--path_bearing', type=float, default=PATH_BEARING_DEG_DEFAULT, help='Path target bearing in degrees')
     parser.add_argument('--path_curvature', type=float, default=PATH_CURVATURE_DEFAULT, dest='path_curvature', help='Path curvature (signed) in m^-1')
     parser.add_argument('--steps', action='store_true', help='Stop simulation every second to evaluate vehicle state')
     parser.add_argument('--vehicle_speed', type=float, dest='vehicle_speed', default=MAX_VELOCITY/2, help='Initial vehicle speed in m/s')
-    parser.add_argument('--world_size', type=float, dest='world_size', default=WORLD_SIZE_DEFAULT, help='World size in meters (will be a square with Size x Size shape)')
+    parser.add_argument('--world_size', dest='world_size', default=WORLD_SIZE_DEFAULT, help='World size in meters (will be a square with Size x Size shape)')
     parser.add_argument('--nominal_airspeed', type=float, default=NOM_VELOCITY, help='Nominal airspeed that vehicle should achieve when on path')
     args = parser.parse_args()
 
     env=MC_npfg_pointmass(args.debug, args.path_bearing, args.path_curvature, args.steps, args.vehicle_speed, args.nominal_airspeed, args.world_size)
     env.test_env()
-
-if __name__ == "__main__":
-    main()
