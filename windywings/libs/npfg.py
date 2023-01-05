@@ -17,6 +17,8 @@ from scipy.spatial.transform import Rotation
 AIRSPEED_NOM_DEFAULT = 15.0 # [m/s] Default nominal airspeed in NPFG
 AIRSPEED_MAX_DEFAULT = 25.0 # [m/s] Default maximum airspeed in NPFG
 
+ACCEL_FF_SHAPE = (2,) # Shape of the acceleration feed-forward term for path curvature compensation
+
 class NPFG:
     def __init__(self, airspeed_nom = AIRSPEED_NOM_DEFAULT, airspeed_max = AIRSPEED_MAX_DEFAULT):
         ''' Initialize NPFG library with vehicle specific parameters '''
@@ -38,7 +40,7 @@ class NPFG:
 
         # Internal Variables for Runtime calculation (needed for implementation details)
         self.air_vel_ref = np.array([0.0, 0.0]) # [m/s] Air velocity reference command generated
-        self.accel_ff_curve = np.array([0.0, 0.0]) # [m/s^2] Feed-forward acceleration command for following the curvature of the path
+        self.accel_ff_curve = np.array([0.0, 0.0]) # [m/s^2] Feed-forward acceleration command for following the curvature of the path in global frame
 
         # Internal Variables for debugging only! (Should not be 'read' internally)
         self.d_position_error_vec = np.array([0.0, 0.0])
@@ -173,7 +175,7 @@ class NPFG:
         return max(self.min_ground_speed, min_gsp_track_keeping) # Set minimum bound to user set min ground speed
 
     def lateralAccelFF(self, unit_path_tangent, ground_velocity, air_speed, signed_track_error, path_curvature):
-        ''' Calculates additional lateral acceleration for path curvature (scalar) '''
+        ''' Calculates additional lateral acceleration (2D, global frame) for following path curvature '''
         # NOTE: Calculation is done as if vehicle is at the path setpoint with 0 error, and having to follow the path curvature!
         assert np.shape(unit_path_tangent) == (2, )
         assert np.shape(ground_velocity) == (2, )
@@ -189,11 +191,12 @@ class NPFG:
 
         # Since it is to follow a curve, it is orthogonal to unit path tangent
         # With curvature > 0, it is counter-clockwise turn, hence rotation of PI/2 from unit path tangent
-        # rot = Rotation.from_euler('z', (np.pi/2))
-        # unit_path_tangent_3d = np.array([unit_path_tangent[0], unit_path_tangent[1], 0.0])
-        # unit_path_tangent_orthogonal = rot.apply(unit_path_tangent_3d)[0:2]
+        rot = Rotation.from_euler('z', (np.pi/2))
+        unit_path_tangent_3d = np.array([unit_path_tangent[0], unit_path_tangent[1], 0.0])
+        unit_path_tangent_orthogonal = rot.apply(unit_path_tangent_3d)[0:2]
+        curvature_sign = bool(path_curvature > 0)
                 
-        return accel_ff_magnitude
+        return accel_ff_magnitude * unit_path_tangent_orthogonal * curvature_sign
 
     def getAirVelRef(self):
         ''' Air velocity reference vector (desired air-velocity) '''
@@ -201,8 +204,8 @@ class NPFG:
         return self.air_vel_ref
 
     def getAccelFFCurvature(self):
-        ''' Acceleration Feed-forward term required for following path curvature '''
-        assert np.isscalar(self.accel_ff_curve)
+        ''' Acceleration Feed-forward (2D vector, global frame) required for following path curvature '''
+        assert np.shape(self.accel_ff_curve) == ACCEL_FF_SHAPE
         return self.accel_ff_curve
 
     def guideToPath_nowind(self, ground_vel, unit_path_tangent, signed_track_error, curvature):
@@ -241,7 +244,7 @@ class NPFG:
         lateral_accel = self.lateralAccel(air_vel, self.air_vel_ref)
         self.accel_ff_curve = self.lateralAccelFF(unit_path_tangent, ground_vel, air_speed, signed_track_error, curvature)
         assert np.isscalar(lateral_accel)
-        assert np.isscalar(self.accel_ff_curve)
+        assert np.shape(self.accel_ff_curve) == ACCEL_FF_SHAPE
 
         # Debug values
         self.d_track_error_bound = track_error_bound
@@ -251,7 +254,8 @@ class NPFG:
         self.d_bearing_vector = bearing_vector
         self.d_lateral_accel_no_curve = lateral_accel
 
-        return lateral_accel + feas_combined * track_proximity * self.accel_ff_curve
+        # NOTE: For now, we just take the norm of the accel ff term and assume it is in 'lateral' direction to air velocity vector (which probably isn't true..?)
+        return lateral_accel + feas_combined * track_proximity * np.linalg.norm(self.accel_ff_curve)
 
     def navigatePathTangent_nowind(self, vehicle_pos, position_setpoint, tangent_setpoint, ground_vel, curvature):
         ''' Follow the line path specified by position, path tangent & curvature. Acts as a proxy to the `guidetoPath` function '''
