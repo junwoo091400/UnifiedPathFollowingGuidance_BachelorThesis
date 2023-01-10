@@ -44,7 +44,7 @@ PATH_UNIT_TANGENT_VEC = np.array([1.0, 0.0])
 PATH_CURVATURE = 0.0
 
 WORLD_HALF_SIZE = (100, 100) # World to visualize in meters, each half distance (X, Y)
-GRID_LENGTH = 10.0 # Interval that air velocity reference vector will be calculated at in both X and Y direction
+grid_size = 10.0 # Interval that air velocity reference vector will be calculated at in both X and Y direction
 
 # User adjustable
 TRACK_ERROR_BOUNDARY = 50 # NOTE: This isn't respected in TJ NPFG
@@ -76,16 +76,18 @@ def TJ_NPFG(vel_range, max_acc_xy, pos, ground_speed):
 
 def main():
     # Visualization data setup
-    grid_range = np.arange(-WORLD_HALF_SIZE[0], WORLD_HALF_SIZE[0] + GRID_LENGTH/2, GRID_LENGTH)
-    grid_length = len(grid_range)
+    grid_xrange = np.arange(-WORLD_HALF_SIZE[0], WORLD_HALF_SIZE[0] + grid_size/2, grid_size)
+    grid_xlength = len(grid_xrange)
+    grid_ylength = grid_xlength//2 + 1 # We only draw (y <= 0) portion of the world, as that's the only relevant part for velocity reference curves
+    grid_yrange = grid_xrange[0:grid_ylength]
 
     # Data for each different formulations
-    grid_data_tj_npfg = np.empty((grid_length, grid_length, 2)) # Placeholder for data for each grid section
+    grid_data_tj_npfg = np.empty((grid_xlength, grid_ylength, 2)) # Placeholder for data for each grid section
 
     # Calculation for Visualization
-    for x_idx in range(grid_length):
-        for y_idx in range(grid_length):
-            vehicle_position = np.array([grid_range[x_idx], grid_range[y_idx]])
+    for x_idx in range(grid_xlength):
+        for y_idx in range(grid_ylength):
+            vehicle_position = np.array([grid_xrange[x_idx], grid_xrange[y_idx]])
             
             # TJ NPFG
             grid_data_tj_npfg[x_idx][y_idx] = TJ_NPFG(VELOCITY_RANGE_DEFAULT, MAX_ACC_DEFAULT, vehicle_position, GROUND_SPEED_DEFAULT)
@@ -104,13 +106,14 @@ def main():
     # Draw the result
     fig = plt.figure(figsize=(10, 10))
     # https://matplotlib.org/3.1.0/api/_as_gen/matplotlib.figure.Figure.html#matplotlib.figure.Figure.add_subplot
-    ax_V_parallel = fig.add_subplot(2, 1, 1)
+    ax_V_parallel = fig.add_subplot(2, 2, 1)
     ax_V_parallel.set_title('Velocity parallel to path')
     ax_V_parallel.set_ylabel('V parallel [m/s]')
+    ax_V_parallel.set_xlabel('Normalized track error boundary')
     ax_V_parallel.grid()
 
     # Shares the X-axis range with parallel velocity plot (dynamically updates when user zooms in the plot)
-    ax_V_orthogonal = fig.add_subplot(2, 1, 2, sharex=ax_V_parallel)
+    ax_V_orthogonal = fig.add_subplot(2, 2, 2, sharex=ax_V_parallel)
     ax_V_orthogonal.set_title('Velocity orthogonal to path')
     ax_V_orthogonal.set_ylabel('V orthogonal [m/s]')
     ax_V_orthogonal.set_xlabel('Normalized track error boundary')
@@ -118,7 +121,7 @@ def main():
 
     # https://matplotlib.org/3.1.0/api/_as_gen/matplotlib.axes.Axes.plot.html#matplotlib.axes.Axes.plot
     # We only clip the Y axis range with negative coordinate, as then the vector field in XY direction are both positive (Better to plot)
-    path_error_Y_range = grid_range[grid_range < 0]
+    path_error_Y_range = grid_xrange[grid_xrange < 0]
     path_error_Y_length = len(path_error_Y_range)
 
     print('TJ NPFG Track error boundary: {}m'.format(tj_npfg_track_error_boundary))
@@ -132,25 +135,45 @@ def main():
 
     ax_V_parallel.legend()
     ax_V_orthogonal.legend()
-    plt.show()
-
-    print('Exiting main function ...')
-    exit()
+    # plt.show()
 
     ## Vector Field Drawing
+    ax_VF = fig.add_subplot(2, 1, 2) # Lower
+
+    # User Settings
+    TJ_NPFG_TRACK_ERROR_BOUNDARY_STYLE = 'dashed'
+    TJ_NPFG_TRACK_ERROR_BOUNDARY_COLOR = 'r'
+
+    # Draw the track error boundary
+    ax_VF.hlines(tj_npfg_track_error_boundary, xmin=np.min(grid_xrange), xmax=np.max(grid_xrange), colors=TJ_NPFG_TRACK_ERROR_BOUNDARY_COLOR, linestyles=TJ_NPFG_TRACK_ERROR_BOUNDARY_STYLE)
+    ax_VF.hlines(-tj_npfg_track_error_boundary, xmin=np.min(grid_xrange), xmax=np.max(grid_xrange), colors=TJ_NPFG_TRACK_ERROR_BOUNDARY_COLOR, linestyles=TJ_NPFG_TRACK_ERROR_BOUNDARY_STYLE)
 
     # Meshgrid must be indexed in matrix form (i, j), so to have the ROW be constant X values (as in data bucket)
-    X, Y = np.meshgrid(grid_range, grid_range, indexing='ij')
+    # Normalized y-range, for better sync (visualization) with the velocity curve
+    grid_yrange_normalized = grid_yrange / tj_npfg_track_error_boundary
+
+    X, Y = np.meshgrid(grid_xrange, grid_yrange_normalized, indexing='ij')
     vx = grid_data_tj_npfg[:, :, 0]
     vy = grid_data_tj_npfg[:, :, 1]
+    ax_VF.quiver(X, Y, vx, vy, color='b')
 
-    plt.quiver(X, Y, vx, vy, color='b')
-    plt.title('Va_ref VF of NPFG. Vg={:.1f}, Vnom={:.1f}'.format(GROUND_SPEED_DEFAULT, VELOCITY_RANGE_DEFAULT[1]))
+    ax_VF.set_title('Va_ref VF of NPFG. Vg={:.1f}, Vnom={:.1f}'.format(GROUND_SPEED_DEFAULT, VELOCITY_RANGE_DEFAULT[1]))
+    ax_VF.set_xlim(np.min(grid_xrange), np.max(grid_xrange))
+    ax_VF.set_ylim(np.min(grid_yrange_normalized), np.max(grid_yrange_normalized) + grid_size/2) # Make sure the top (Y=0) vectors get shown, by increasing Ymax range
+    ax_VF.set_ylabel('Normalized position')
+    ax_VF.grid()
 
-    # Finalize Plot
-    plt.xlim(-WORLD_HALF_SIZE[0], WORLD_HALF_SIZE[0])
-    plt.ylim(-WORLD_HALF_SIZE[1], WORLD_HALF_SIZE[1])
-    plt.grid()
+    # https://stackoverflow.com/questions/45423166/matplotlib-share-xaxis-with-yaxis-from-another-plot
+    # https://stackoverflow.com/questions/31490436/matplotlib-finding-out-xlim-and-ylim-after-zoom
+    def on_normalized_path_error_bound_changed(event_ax):
+        normalized_path_error_bound = np.array(event_ax.get_xlim())
+        # Multiply -1, to negative y range, as we are only visualizing (y < 0) portion
+        # Also flip the array, so that we actually have [A, B] bound where A < B.
+        ax_VF.set_ylim(-np.flip(normalized_path_error_bound))
+
+    # Connect hook when user zooms onto specific normalized path error (X-axis of the Velocity Curve Plot)
+    ax_V_parallel.callbacks.connect('xlim_changed', on_normalized_path_error_bound_changed)
+
     plt.show()
 
     print('Main function exiting ...')
