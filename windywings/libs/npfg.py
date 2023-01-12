@@ -35,7 +35,7 @@ class NPFG:
         self.p_gain = 0.8885 # [rad/s] Proportional game, computed from period and damping
         self.airspeed_nom = airspeed_nom # [m/s] Nominal (desired) airspeed refernece, a.k.a cruise optimized airspeed
         self.airspeed_max = airspeed_max # [m/s] Maximum airspeed vehicle can achieve
-        self.min_ground_speed = 5.0 # [m/s] Minimum ground speed to keep at all times
+        self.min_ground_speed = 0.0 # [m/s] Minimum ground speed to keep at all times (if not set to 0, this interferes and over-writes the track-keeping induced min ground speed!!)
         self.max_min_ground_speed_track_keeping = 5.0 # [m/s] Maximum 'minimum ground speed' track keeping feature can command (grows linearly with track error)
 
         # Internal Variables for Runtime calculation (needed for implementation details)
@@ -238,7 +238,7 @@ class NPFG:
         self.air_vel_ref = self.refAirVelocity(bearing_vector, minimum_groundspeed_reference)
 
         # Debug output
-        # print('Feas combined: {:.2f}, Normalized Track error: {:.2f}, Min groundspeed:{:.1f}'.format(feas_combined, normalized_track_error, minimum_groundspeed_reference))
+        print('Feas combined: {:.2f}, Normalized Track error: {:.2f}, Min groundspeed:{:.1f}'.format(feas_combined, normalized_track_error, minimum_groundspeed_reference))
 
         # OUTPUT
         lateral_accel = self.lateralAccel(air_vel, self.air_vel_ref)
