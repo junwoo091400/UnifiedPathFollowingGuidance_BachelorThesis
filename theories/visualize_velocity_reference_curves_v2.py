@@ -22,21 +22,20 @@ import matplotlib.pyplot as plt
 from velocity_reference_algorithms import TjNpfg, TjNpfgBearingFeasibilityStripped
 
 # Constants
-TRACK_ERROR_MAX = 50.0 # [m] Maximum track error we simulate (in Y-direction, as path is parallel to X axis)
+TRACK_ERROR_MAX = 10.0 # [m] Maximum track error we simulate (in Y-direction, as path is parallel to X axis)
 GRID_SIZE = 1.0 # [m] Interval that data will be calculated along track error axis
 PATH_DESIRED_SPEED = 10.0 # [m/s] Desired speed on path
 
 # User adjustable
+GROUND_SPEED_DEFAULT = 1.0 # Only should be used by TJ NPFG
 VELOCITY_RANGE_DEFAULT = np.array([0.0, 0.0, 20.0]) # Arbitrary min, nom and max speed
 MAX_ACC_DEFAULT = 10.0 # Default max acc value [m/s^2]
 MAX_JERK_DEFAULT = 5.0 # Default max jerk [m/s^3]
 
-# Class specific constant
-GROUND_SPEED_DEFAULT = VELOCITY_RANGE_DEFAULT[1] # Only should be used by TJ NPFG
-
 # Algorithms
-PF_ALGORITHMS_COUNT = 1 # Used for creating the data bucket for storing calculations
+PF_ALGORITHMS_COUNT = 2 # Used for creating the data bucket for storing calculations
 PF_ALGORITHM_TJ_NPFG_IDX = 0
+PF_ALGORITHM_TJ_NPFG_BF_STRIPPED_IDX = 1
 
 def main():
     # Visualization data setup
@@ -48,18 +47,15 @@ def main():
 
     # Instances for each algorithms
     tj_npfg = TjNpfg(VELOCITY_RANGE_DEFAULT, MAX_ACC_DEFAULT, MAX_JERK_DEFAULT, GROUND_SPEED_DEFAULT)
-    tj_npfg_bf_stripped = TjNpfgBearingFeasibilityStripped()
+    tj_npfg_bf_stripped = TjNpfgBearingFeasibilityStripped(VELOCITY_RANGE_DEFAULT, MAX_ACC_DEFAULT, MAX_JERK_DEFAULT, GROUND_SPEED_DEFAULT)
 
     # Calculation for Visualization
     for y_idx in range(track_error_len):
-        # TJ NPFG
-        grid_data[PF_ALGORITHM_TJ_NPFG_IDX][y_idx] = TJ_NPFG(VELOCITY_RANGE_DEFAULT, MAX_ACC_DEFAULT, PATH_DESIRED_SPEED, track_error_range[y_idx], GROUND_SPEED_DEFAULT)
-
-        # Modified NPFG (no bearing feasibility stuff)
-        # TODO
+        grid_data[PF_ALGORITHM_TJ_NPFG_IDX][y_idx] = tj_npfg.calculate_velRef(track_error_range[y_idx], PATH_DESIRED_SPEED)
+        grid_data[PF_ALGORITHM_TJ_NPFG_BF_STRIPPED_IDX][y_idx] = tj_npfg_bf_stripped.calculate_velRef(track_error_range[y_idx], PATH_DESIRED_SPEED)
 
     # Special data per algorithm for visualization
-    tj_npfg_track_error_boundary = NPFG().trackErrorBound(GROUND_SPEED_DEFAULT, NPFG().time_const)
+    tj_npfg_track_error_boundary = tj_npfg.get_track_error_boundary()
 
     ## Velocity ramp-in Drawing
 
@@ -69,6 +65,9 @@ def main():
     TJ_NPFG_LEGEND = 'TJ NPFG'
     TJ_NPFG_TRACK_ERROR_BOUNDARY_STYLE = 'dashed'
     TJ_NPFG_TRACK_ERROR_BOUNDARY_COLOR = 'b' # Not sure if I would keep it equal to line color
+
+    TJ_NPFG_BF_STRIPPED_COLOR = 'g'
+    TJ_NPFG_BF_STRIPPED_LABEL = 'TJ NPFG BF Stripped'
 
     # Draw the result
     fig = plt.figure(figsize=(10, 9))
@@ -88,17 +87,21 @@ def main():
     ax_V_orthogonal.set_xlabel('Track error [m]')
     ax_V_orthogonal.grid()
 
-    print('TJ NPFG Track error boundary: {}m'.format(tj_npfg_track_error_boundary))
-
-    # X-axis is always the 'normalized' track error
-    # X index of the grid data doesn't matter, as it's a straight line path in X direction (hence doesn't vary the calculation)
-    # X (0th index of the vector in the grid) is the 'parallel' component to the path
+    # TJ NPFG Velocity curves
     ax_V_parallel.plot(np.abs(track_error_range), grid_data[PF_ALGORITHM_TJ_NPFG_IDX, : , 0], marker=TJ_NPFG_MARKER_TYPE, label=TJ_NPFG_LEGEND, color=TJ_NPFG_LINE_COLOR)
-    ax_V_orthogonal.plot(np.abs(track_error_range), grid_data[PF_ALGORITHM_TJ_NPFG_IDX, : , 1], marker=TJ_NPFG_MARKER_TYPE, label=TJ_NPFG_LEGEND, color=TJ_NPFG_LINE_COLOR)
-
-    # Track error boundary
     ax_V_parallel.axvline(tj_npfg_track_error_boundary, ymin=np.min(track_error_range), ymax=np.max(track_error_range), color=TJ_NPFG_TRACK_ERROR_BOUNDARY_COLOR, linestyle=TJ_NPFG_TRACK_ERROR_BOUNDARY_STYLE)
+    ax_V_orthogonal.plot(np.abs(track_error_range), grid_data[PF_ALGORITHM_TJ_NPFG_IDX, : , 1], marker=TJ_NPFG_MARKER_TYPE, label=TJ_NPFG_LEGEND, color=TJ_NPFG_LINE_COLOR)
     ax_V_orthogonal.axvline(tj_npfg_track_error_boundary, ymin=np.min(track_error_range), ymax=np.max(track_error_range), color=TJ_NPFG_TRACK_ERROR_BOUNDARY_COLOR, linestyle=TJ_NPFG_TRACK_ERROR_BOUNDARY_STYLE)
+
+    # TJ NPFG BF Stripped Velocity curves
+    ax_V_parallel.plot(np.abs(track_error_range), grid_data[PF_ALGORITHM_TJ_NPFG_BF_STRIPPED_IDX, : , 0], marker=TJ_NPFG_MARKER_TYPE, label=TJ_NPFG_BF_STRIPPED_LABEL, color=TJ_NPFG_BF_STRIPPED_COLOR)
+    ax_V_parallel.axvline(tj_npfg_track_error_boundary, ymin=np.min(track_error_range), ymax=np.max(track_error_range), color=TJ_NPFG_BF_STRIPPED_COLOR, linestyle=TJ_NPFG_TRACK_ERROR_BOUNDARY_STYLE)
+    ax_V_orthogonal.plot(np.abs(track_error_range), grid_data[PF_ALGORITHM_TJ_NPFG_BF_STRIPPED_IDX, : , 1], marker=TJ_NPFG_MARKER_TYPE, label=TJ_NPFG_BF_STRIPPED_LABEL, color=TJ_NPFG_BF_STRIPPED_COLOR)
+    ax_V_orthogonal.axvline(tj_npfg_track_error_boundary, ymin=np.min(track_error_range), ymax=np.max(track_error_range), color=TJ_NPFG_BF_STRIPPED_COLOR, linestyle=TJ_NPFG_TRACK_ERROR_BOUNDARY_STYLE)
+
+    # Debug
+    print('TJ NPFG Track error boundary: {}m'.format(tj_npfg_track_error_boundary))
+    print('Diff in Vel ref (stripped - TJ NPFG):', grid_data[PF_ALGORITHM_TJ_NPFG_BF_STRIPPED_IDX, : , 0] - grid_data[PF_ALGORITHM_TJ_NPFG_IDX, : , 0])
 
     # Legend
     ax_V_parallel.legend()
@@ -109,8 +112,6 @@ def main():
 
     ## Vector Field Drawing
     # ax_VF = fig.add_subplot(2, 1, 2) # Lower
-
-    
 
     # # Draw the track error boundary
     # ax_VF.hlines(tj_npfg_track_error_boundary, xmin=np.min(grid_xrange), xmax=np.max(grid_xrange), colors=TJ_NPFG_TRACK_ERROR_BOUNDARY_COLOR, linestyles=TJ_NPFG_TRACK_ERROR_BOUNDARY_STYLE)

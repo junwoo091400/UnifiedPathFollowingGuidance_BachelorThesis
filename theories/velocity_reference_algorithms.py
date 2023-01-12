@@ -67,10 +67,18 @@ class VelocityReferenceCurves:
         '''
         assert False, "calculate_velRef of base class shouldn't be used directly!"
 
+    def get_track_error_boundary(self):
+        '''
+        Helper function to return track error boundary calculated from last `calculate_velRef` execution
+
+        This needs to be different for each method derived from this base class
+        '''
+        assert False, "get_track_error_boundary of base class shouldn't be used directly!"
+
 class TjNpfg(VelocityReferenceCurves):
     def __init__(self, vel_range, max_acc, max_jerk, ground_speed):
         # Initialize class
-        super().init(vel_range, max_acc, max_jerk)
+        super().__init__(vel_range, max_acc, max_jerk)
         self.ground_speed = ground_speed # Additional argument for TJ NPFG, stays constant
         assert self.ground_speed >= self.vel_range[0] and self.ground_speed <= self.vel_range[2]
 
@@ -90,12 +98,17 @@ class TjNpfg(VelocityReferenceCurves):
 
         # Augmented position of the vehicle from the track error. We place vehicle on y < 0 coordinate, under the line (y == 0)
         vehicle_pos = PATH_POSITION + track_error * np.array([0.0, -1.0])
+
+        # Note: the actual course angle of the vehicle wouldn't affect the air-velocity ref vector calculation. Only magnitude gets accounted for.
         self.npfg.navigatePathTangent_nowind(vehicle_pos, PATH_POSITION, PATH_UNIT_TANGENT_VEC, self.ground_speed * np.array([1.0, 0.0]), PATH_CURVATURE)
 
         # X, Y component. Should represent Parallel and Orthogonal components of reference velocity curve
         return self.npfg.getAirVelRef()
 
-class TjNpfgBearingFeasibilityStripped(VelocityReferenceCurves):
+    def get_track_error_boundary(self):
+        return self.npfg.d_track_error_bound
+
+class TjNpfgBearingFeasibilityStripped(TjNpfg):
     '''
     This is a simplified implementation of TJ's NPFG, with the bearing feasibility functionality stripped.
 
@@ -110,4 +123,31 @@ class TjNpfgBearingFeasibilityStripped(VelocityReferenceCurves):
 
     And it includes the assumptions of:
     '''
-    
+
+    # Constructor is shared with TjNpfg class
+
+    def calculate_velRef(self, track_error, desired_speed):
+        '''
+        Returns velocity reference, bypassing bearing feasibility calculation
+
+        Basically replaces the `guideToPath_nowind` function.
+        '''
+        self.assert_input_variables(track_error, desired_speed)
+
+        # Constants
+        NEGATIVE_TRACK_ERROR_AUGMENT = -1.0 # Augmented signed track error to have an effect of vehicle being at 'right' side of the path. Used in `bearingVec` func of NPFG
+        ZERO_FEASIBILITY_COMBINED_AUGMENT = 0.0 # Augmented combined feasibility, to disable effect of feasibility in scaling in `minGroundSpeed` of NPFG
+
+        # skip `adaptPeriod`, `pGain` and `timeConst` function calls
+
+        # LOGIC
+        # TEB calculation with time-constant is left as legacy
+        track_error_bound = self.npfg.trackErrorBound(self.ground_speed, self.npfg.time_const)
+        normalized_track_error = np.clip(track_error/track_error_bound, 0.0, 1.0)
+
+        look_ahead_ang = self.npfg.lookAheadAngle(normalized_track_error) # LAA solely based on track proximity (normalized)
+        bearing_vector = self.npfg.bearingVec(PATH_UNIT_TANGENT_VEC, look_ahead_ang, NEGATIVE_TRACK_ERROR_AUGMENT)
+        minimum_groundspeed_reference = self.npfg.minGroundSpeed(normalized_track_error, ZERO_FEASIBILITY_COMBINED_AUGMENT)
+        
+        # X, Y component. Should represent Parallel and Orthogonal components of reference velocity curve
+        return self.npfg.refAirVelocity(bearing_vector, minimum_groundspeed_reference)
