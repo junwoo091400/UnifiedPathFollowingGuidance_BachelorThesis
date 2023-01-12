@@ -151,3 +151,25 @@ class TjNpfgBearingFeasibilityStripped(TjNpfg):
         
         # X, Y component. Should represent Parallel and Orthogonal components of reference velocity curve
         return self.npfg.refAirVelocity(bearing_vector, minimum_groundspeed_reference)
+
+class RuckigTimeOptimalTrajectory(VelocityReferenceCurves):
+    '''
+    Utilizes the `ruckig` package from the paper: "Jerk-limited Real-time Trajectory Generation with Arbitrary Target States" (http://arxiv.org/abs/2105.04830)
+
+    This library creates a bang-bang controller type (on Jerk term) trajectory that guarantees a time-optimal
+    trajectory that reaches the target condition.
+
+    Goal of the trajectory:
+    - As the 'parallel' position (distance) on the path as a target is undefined (we can freely choose), we simply
+    choose to reach the 'target speed on path' in optimal time, along with coming to a stop in orthogonal direction.
+    - Therefore, target pos = {track error, UNDEFINED} and target vel = {0, path speed target}, in orthogonal/parallel terms each.
+    
+    Limitations:
+    - Jerk limit is applied to each axis, hence the max jerk is actually sqrt(2) * Jerk, in most cases actually (But could be improved on time synchronization step by modifying the library)
+
+    Findings:
+    - The 'initial' condition is actually not well defined, depending on the trajectory we can always have different speed/acceleration as an initial condition
+    - One method to bypass this would be to consider that at the 'track error boundary', the vehicle is at it's max approach speed & 0 acceleration
+    - This will then formulate the whole vector field, and trajectory won't be generated for each different track error conditions, but would simply provide output
+    of the look-up table formulated initially from the track error boundary condition assumption.
+    '''
