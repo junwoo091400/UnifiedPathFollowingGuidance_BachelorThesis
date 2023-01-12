@@ -18,70 +18,25 @@ Note:
 import numpy as np
 import matplotlib.pyplot as plt
 
-from windywings.libs.npfg import NPFG
-
-'''
-Definition of Velocity Reference Generating Functions
-
-Input:
-- Minimum, Nominal, Maximum Airspeed
-- Maximum Acceleration (assuming point-mass model, applies for XY component in total)
-- Desired Speed on path: Although PF algorithm shouldn't require this as an input, we would use 'nominal speed' otherwise, which is just a hidden assumption. This exposes that.
-- Track error (orthogonal distance from the path)
-- Vehicle speed (Forced to input, due to TJ NPFG constraints)
-
-NOTE: Track Error boundary will be determined automatically
-
-Output:
-- Velocity reference vector [X, Y] in [m/s] (always positive)
-'''
+# Import the velocity curve functions
+from velocity_reference_algorithms import TjNpfg, TjNpfgBearingFeasibilityStripped
 
 # Constants
-VELOCITY_RANGE_SHAPE = (3,)
-
-PATH_POSITION = np.array([0, 0])
-PATH_UNIT_TANGENT_VEC = np.array([1.0, 0.0])
-PATH_CURVATURE = 0.0
+TRACK_ERROR_MAX = 50.0 # [m] Maximum track error we simulate (in Y-direction, as path is parallel to X axis)
+GRID_SIZE = 1.0 # [m] Interval that data will be calculated along track error axis
 PATH_DESIRED_SPEED = 10.0 # [m/s] Desired speed on path
 
-TRACK_ERROR_MAX = 100.0 # [m] Maximum track error we simulate (in Y-direction, as path is parallel to X axis)
-GRID_SIZE = 5.0 # [m] Interval that data will be calculated along track error axis
-
 # User adjustable
-VELOCITY_RANGE_DEFAULT = np.array([0.0, 10.0, 20.0]) # Arbitrary min, nom and max speed
+VELOCITY_RANGE_DEFAULT = np.array([0.0, 0.0, 20.0]) # Arbitrary min, nom and max speed
 MAX_ACC_DEFAULT = 10.0 # Default max acc value [m/s^2]
-GROUND_SPEED_DEFAULT = VELOCITY_RANGE_DEFAULT[1]
+MAX_JERK_DEFAULT = 5.0 # Default max jerk [m/s^3]
+
+# Class specific constant
+GROUND_SPEED_DEFAULT = VELOCITY_RANGE_DEFAULT[1] # Only should be used by TJ NPFG
 
 # Algorithms
 PF_ALGORITHMS_COUNT = 1 # Used for creating the data bucket for storing calculations
 PF_ALGORITHM_TJ_NPFG_IDX = 0
-
-def assert_input_variables(vel_range, max_acc_xy, desired_speed, track_error, ground_speed):
-    assert np.shape(vel_range) == VELOCITY_RANGE_SHAPE
-    assert ground_speed > vel_range[0] and ground_speed < vel_range[2] # Velocity in sane vehicle limit range
-    assert ground_speed > 0
-    assert max_acc_xy > 0
-    assert track_error >= 0
-    assert desired_speed >= 0
-
-def TJ_NPFG(vel_range, max_acc_xy, desired_speed, track_error, ground_speed):
-    '''
-    Returns velocity reference, as defined in TJ's NPFG
-
-    NOTE
-    - Velocity of vehicle is always in X-axis direction (doesn't affect NPFG calculation)
-    - Position of vehicle is at (0, pos_y)
-    '''
-    assert_input_variables(vel_range, max_acc_xy, desired_speed, track_error, ground_speed)
-
-    npfg = NPFG(vel_range[1], vel_range[2])
-    
-    # Augmented position of the vehicle from the track error. We place vehicle on y < 0 coordinate, under the line (y == 0)
-    vehicle_pos = PATH_POSITION + track_error * np.array([0.0, -1.0])
-
-    npfg.navigatePathTangent_nowind(vehicle_pos, PATH_POSITION, PATH_UNIT_TANGENT_VEC, ground_speed * np.array([1.0, 0.0]), PATH_CURVATURE)
-
-    return npfg.getAirVelRef()
 
 def main():
     # Visualization data setup
@@ -90,6 +45,10 @@ def main():
 
     # Data for each different formulations
     grid_data = np.empty((PF_ALGORITHMS_COUNT, track_error_len, 2))
+
+    # Instances for each algorithms
+    tj_npfg = TjNpfg(VELOCITY_RANGE_DEFAULT, MAX_ACC_DEFAULT, MAX_JERK_DEFAULT, GROUND_SPEED_DEFAULT)
+    tj_npfg_bf_stripped = TjNpfgBearingFeasibilityStripped()
 
     # Calculation for Visualization
     for y_idx in range(track_error_len):
@@ -112,7 +71,9 @@ def main():
     TJ_NPFG_TRACK_ERROR_BOUNDARY_COLOR = 'b' # Not sure if I would keep it equal to line color
 
     # Draw the result
-    fig = plt.figure(figsize=(5, 10))
+    fig = plt.figure(figsize=(10, 9))
+    fig.suptitle("Vnom {}m/s, Vmax {}m/s, Vpath {} m/s, Vg = {}m/s, Max Acc {}m/s^2, Max Jerk {}m/s^3".format(VELOCITY_RANGE_DEFAULT[1], VELOCITY_RANGE_DEFAULT[2], PATH_DESIRED_SPEED, GROUND_SPEED_DEFAULT, MAX_ACC_DEFAULT, MAX_JERK_DEFAULT))
+
     # https://matplotlib.org/3.1.0/api/_as_gen/matplotlib.figure.Figure.html#matplotlib.figure.Figure.add_subplot
     ax_V_parallel = fig.add_subplot(3, 1, 1)
     ax_V_parallel.set_title('Velocity parallel to path')
@@ -143,6 +104,7 @@ def main():
     ax_V_parallel.legend()
     ax_V_orthogonal.legend()
     
+    fig.tight_layout() # Make sure graphs don't overlap
     plt.show()
 
     ## Vector Field Drawing
