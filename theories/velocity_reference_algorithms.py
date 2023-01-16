@@ -201,7 +201,7 @@ class TjNpfgCartesianlVapproachMin(TjNpfg):
         super().__init__(vel_range, max_acc, max_jerk, GROUND_SPEED_DUMMY)
         self.v_approach_min = v_approach_min
 
-    def calculate_velRef(self, track_error, v_path, v_approach):
+    def calculate_velRef(self, track_error, v_path):
         '''
         Depending on (track_error, v_approach), draw different VF
 
@@ -214,9 +214,11 @@ class TjNpfgCartesianlVapproachMin(TjNpfg):
         NEGATIVE_TRACK_ERROR_AUGMENT = -1.0 # Augmented signed track error to have an effect of vehicle being at 'right' side of the path. Used in `bearingVec` func of NPFG
         ZERO_FEASIBILITY_COMBINED_AUGMENT = 0.0 # Augmented combined feasibility, to disable effect of feasibility in scaling in `minGroundSpeed` of NPFG
 
-        if v_approach > self.v_approach_min:
-            # High speed approach, treat like TJ's native NPFG
+        # Set the approach speed
+        v_approach = np.max([self.v_approach_min, self.vel_range[1], v_path])
 
+        if v_path > v_approach:
+            # High speed approach, treat like TJ's native NPFG. Unicyclic ramp-in.
             # Set vehicle nominal speed to v_path (velocity on path)
             self.npfg.airspeed_nom = v_path
 
@@ -235,10 +237,8 @@ class TjNpfgCartesianlVapproachMin(TjNpfg):
             # X, Y component. Should represent Parallel and Orthogonal components of reference velocity curve
             return self.npfg.refAirVelocity(bearing_vector, minimum_groundspeed_reference)
         else:
-            # Low speed approach, we need to clip the approach speed curve to respect minimum speed
-            # NOTE: We don't use any parameters related to nominal airspeed, etc in TJ NPFG
-
-            self.track_error_bound = self.npfg.trackErrorBound(self.v_approach_min, self.npfg.time_const)
+            # Velocity on path is lower than the nominal unicyclic trajectory velocity constraint.
+            self.track_error_bound = self.npfg.trackErrorBound(v_approach, self.npfg.time_const)
             normalized_track_error = np.clip(track_error/self.track_error_bound, 0.0, 1.0)
             
             look_ahead_ang = self.npfg.lookAheadAngle(normalized_track_error) # LAA solely based on track proximity (normalized)
@@ -250,7 +250,7 @@ class TjNpfgCartesianlVapproachMin(TjNpfg):
 
             # Simply apply ramp-in & ramp-out on the Vpath and Vapproach
             v_parallel = v_path * track_proximity
-            v_orthogonal = self.v_approach_min * (1 - track_proximity)
+            v_orthogonal = v_approach * (1 - track_proximity)
             
             # Parallel, Orthogonal vel component
             return np.array([v_parallel, v_orthogonal])

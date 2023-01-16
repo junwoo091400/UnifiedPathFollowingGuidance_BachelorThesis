@@ -22,11 +22,11 @@ import matplotlib.pyplot as plt
 from velocity_reference_algorithms import *
 
 # Constants
-TRACK_ERROR_MAX = 40 # [m] Maximum track error we simulate (in Y-direction, as path is parallel to X axis)
+TRACK_ERROR_MAX = 80 # [m] Maximum track error we simulate (in Y-direction, as path is parallel to X axis)
 GRID_SIZE = 1.0 # [m] Interval that data will be calculated along track error axis
 
 # User adjustable
-VELOCITY_RANGE_DEFAULT = np.array([0.0, 10.0, 20.0]) # Arbitrary min, nom and max speed
+VELOCITY_RANGE_DEFAULT = np.array([0.0, 10.0, 12.0]) # Arbitrary min, nom and max speed
 PATH_DESIRED_SPEED = 7.0 # [m/s] Desired speed on path
 APPROACH_SPEED_MINIMUM_DEFAULT = 3.0
 GROUND_SPEED_DEFAULT = 2.0 # Only should be used by TJ NPFG
@@ -59,7 +59,7 @@ def main():
         grid_data[PF_ALGORITHM_TJ_NPFG_IDX][y_idx] = tj_npfg.calculate_velRef(track_error_range[y_idx], PATH_DESIRED_SPEED)
         grid_data[PF_ALGORITHM_TJ_NPFG_BF_STRIPPED_IDX][y_idx] = tj_npfg_bf_stripped.calculate_velRef(track_error_range[y_idx], PATH_DESIRED_SPEED)
         # Just consider 'ground speed' used by TJ NPFG, as the 'approach' speed we want in Cartesian V_approach_min algorithm
-        grid_data[PF_ALGORITHM_TJ_NPFG_CARTESIAN_V_APPROACH_MIN_IDX][y_idx] = tj_npfg_cartesian_v_approach_min.calculate_velRef(track_error_range[y_idx], PATH_DESIRED_SPEED, GROUND_SPEED_DEFAULT)
+        grid_data[PF_ALGORITHM_TJ_NPFG_CARTESIAN_V_APPROACH_MIN_IDX][y_idx] = tj_npfg_cartesian_v_approach_min.calculate_velRef(track_error_range[y_idx], PATH_DESIRED_SPEED)
 
     # Special data per algorithm for visualization
     tj_npfg_track_error_boundary = tj_npfg.get_track_error_boundary()
@@ -116,6 +116,16 @@ def main():
 
     # Velocity constraints plot
     VEL_CONSTRAINTS_PLOT_STYLE = 'dashed'
+    # https://matplotlib.org/stable/gallery/lines_bars_and_markers/fill_between_demo.html#selectively-marking-horizontal-regions-across-the-whole-axes
+    # V_NOM_LABEL = 'V_nom'
+    V_NOM_COLOR = 'cornsilk'
+    V_MAX_COLOR = 'mistyrose'
+    ax_V_orthogonal.fill_between(track_error_range, VELOCITY_RANGE_DEFAULT[0], VELOCITY_RANGE_DEFAULT[1], color=V_NOM_COLOR)
+    ax_V_parallel.fill_between(track_error_range, VELOCITY_RANGE_DEFAULT[0], VELOCITY_RANGE_DEFAULT[1], color=V_NOM_COLOR)
+    ax_V_orthogonal.fill_between(track_error_range, VELOCITY_RANGE_DEFAULT[1], VELOCITY_RANGE_DEFAULT[2], color=V_MAX_COLOR)
+    ax_V_parallel.fill_between(track_error_range, VELOCITY_RANGE_DEFAULT[1], VELOCITY_RANGE_DEFAULT[2], color=V_MAX_COLOR)
+    # ax_V_orthogonal.axhline(VELOCITY_RANGE_DEFAULT[1], xmin=np.min(track_error_range), xmax=np.max(track_error_range), color=V_NOM_COLOR, linestyle=VEL_CONSTRAINTS_PLOT_STYLE, label=V_NOM_LABEL)
+    # ax_V_parallel.axhline(VELOCITY_RANGE_DEFAULT[1], xmin=np.min(track_error_range), xmax=np.max(track_error_range), color=V_NOM_COLOR, linestyle=VEL_CONSTRAINTS_PLOT_STYLE, label=V_NOM_LABEL)
 
     APPROACH_SPEED_MINIMUM_LABEL = 'V_approach_minimum'
     ax_V_orthogonal.axhline(APPROACH_SPEED_MINIMUM_DEFAULT, xmin=np.min(track_error_range), xmax=np.max(track_error_range), color='grey', linestyle=VEL_CONSTRAINTS_PLOT_STYLE, label=APPROACH_SPEED_MINIMUM_LABEL)
