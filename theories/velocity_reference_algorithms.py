@@ -173,3 +173,12 @@ class RuckigTimeOptimalTrajectory(VelocityReferenceCurves):
     - This will then formulate the whole vector field, and trajectory won't be generated for each different track error conditions, but would simply provide output
     of the look-up table formulated initially from the track error boundary condition assumption.
     '''
+    def __init__(self, vel_range, max_acc, max_jerk):
+        super().init(vel_range, max_acc, max_jerk)
+
+        # Calculate the track error boundary directly
+        # We assume vehicle heading orthogonal to the path at MAXIMUM velocity, then slowing down
+
+    def calculate_velRef(self, track_error, desired_speed):
+        # Orthogonal velocity follows a simple 
+        return None
