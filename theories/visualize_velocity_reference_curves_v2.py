@@ -19,23 +19,27 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Import the velocity curve functions
-from velocity_reference_algorithms import TjNpfg, TjNpfgBearingFeasibilityStripped
+from velocity_reference_algorithms import *
 
 # Constants
-TRACK_ERROR_MAX = 10.0 # [m] Maximum track error we simulate (in Y-direction, as path is parallel to X axis)
+TRACK_ERROR_MAX = 40 # [m] Maximum track error we simulate (in Y-direction, as path is parallel to X axis)
 GRID_SIZE = 1.0 # [m] Interval that data will be calculated along track error axis
-PATH_DESIRED_SPEED = 10.0 # [m/s] Desired speed on path
 
 # User adjustable
-GROUND_SPEED_DEFAULT = 1.0 # Only should be used by TJ NPFG
-VELOCITY_RANGE_DEFAULT = np.array([0.0, 0.0, 20.0]) # Arbitrary min, nom and max speed
+VELOCITY_RANGE_DEFAULT = np.array([0.0, 10.0, 20.0]) # Arbitrary min, nom and max speed
+PATH_DESIRED_SPEED = 7.0 # [m/s] Desired speed on path
+APPROACH_SPEED_MINIMUM_DEFAULT = 3.0
+GROUND_SPEED_DEFAULT = 2.0 # Only should be used by TJ NPFG
+
+# Not used for now
 MAX_ACC_DEFAULT = 10.0 # Default max acc value [m/s^2]
 MAX_JERK_DEFAULT = 5.0 # Default max jerk [m/s^3]
 
 # Algorithms
-PF_ALGORITHMS_COUNT = 2 # Used for creating the data bucket for storing calculations
+PF_ALGORITHMS_COUNT = 3 # Used for creating the data bucket for storing calculations
 PF_ALGORITHM_TJ_NPFG_IDX = 0
 PF_ALGORITHM_TJ_NPFG_BF_STRIPPED_IDX = 1
+PF_ALGORITHM_TJ_NPFG_CARTESIAN_V_APPROACH_MIN_IDX = 2
 
 def main():
     # Visualization data setup
@@ -48,17 +52,19 @@ def main():
     # Instances for each algorithms
     tj_npfg = TjNpfg(VELOCITY_RANGE_DEFAULT, MAX_ACC_DEFAULT, MAX_JERK_DEFAULT, GROUND_SPEED_DEFAULT)
     tj_npfg_bf_stripped = TjNpfgBearingFeasibilityStripped(VELOCITY_RANGE_DEFAULT, MAX_ACC_DEFAULT, MAX_JERK_DEFAULT, GROUND_SPEED_DEFAULT)
+    tj_npfg_cartesian_v_approach_min = TjNpfgCartesianlVapproachMin(VELOCITY_RANGE_DEFAULT, MAX_ACC_DEFAULT, MAX_JERK_DEFAULT, APPROACH_SPEED_MINIMUM_DEFAULT)
 
     # Calculation for Visualization
     for y_idx in range(track_error_len):
         grid_data[PF_ALGORITHM_TJ_NPFG_IDX][y_idx] = tj_npfg.calculate_velRef(track_error_range[y_idx], PATH_DESIRED_SPEED)
         grid_data[PF_ALGORITHM_TJ_NPFG_BF_STRIPPED_IDX][y_idx] = tj_npfg_bf_stripped.calculate_velRef(track_error_range[y_idx], PATH_DESIRED_SPEED)
+        # Just consider 'ground speed' used by TJ NPFG, as the 'approach' speed we want in Cartesian V_approach_min algorithm
+        grid_data[PF_ALGORITHM_TJ_NPFG_CARTESIAN_V_APPROACH_MIN_IDX][y_idx] = tj_npfg_cartesian_v_approach_min.calculate_velRef(track_error_range[y_idx], PATH_DESIRED_SPEED, GROUND_SPEED_DEFAULT)
 
     # Special data per algorithm for visualization
     tj_npfg_track_error_boundary = tj_npfg.get_track_error_boundary()
 
     ## Velocity ramp-in Drawing
-
     # User Configurations
     TJ_NPFG_LINE_COLOR = 'b'
     TJ_NPFG_MARKER_TYPE = 'o'
@@ -69,9 +75,12 @@ def main():
     TJ_NPFG_BF_STRIPPED_COLOR = 'g'
     TJ_NPFG_BF_STRIPPED_LABEL = 'TJ NPFG BF Stripped'
 
+    TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_COLOR = 'r'
+    TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_LABEL = 'TJ NPFG Cartesian V_approach min'
+
     # Draw the result
-    fig = plt.figure(figsize=(10, 9))
-    fig.suptitle("Vnom {}m/s, Vmax {}m/s, Vpath {} m/s, Vg = {}m/s, Max Acc {}m/s^2, Max Jerk {}m/s^3".format(VELOCITY_RANGE_DEFAULT[1], VELOCITY_RANGE_DEFAULT[2], PATH_DESIRED_SPEED, GROUND_SPEED_DEFAULT, MAX_ACC_DEFAULT, MAX_JERK_DEFAULT))
+    fig = plt.figure(figsize=(12, 10))
+    fig.suptitle("Vnom {}m/s, Vmax {}m/s, Vpath {} m/s, Vg = {}m/s, Vapproach_min = {}m/s".format(VELOCITY_RANGE_DEFAULT[1], VELOCITY_RANGE_DEFAULT[2], PATH_DESIRED_SPEED, GROUND_SPEED_DEFAULT, APPROACH_SPEED_MINIMUM_DEFAULT))
 
     # https://matplotlib.org/3.1.0/api/_as_gen/matplotlib.figure.Figure.html#matplotlib.figure.Figure.add_subplot
     ax_V_parallel = fig.add_subplot(3, 1, 1)
@@ -98,6 +107,21 @@ def main():
     ax_V_parallel.axvline(tj_npfg_track_error_boundary, ymin=np.min(track_error_range), ymax=np.max(track_error_range), color=TJ_NPFG_BF_STRIPPED_COLOR, linestyle=TJ_NPFG_TRACK_ERROR_BOUNDARY_STYLE)
     ax_V_orthogonal.plot(np.abs(track_error_range), grid_data[PF_ALGORITHM_TJ_NPFG_BF_STRIPPED_IDX, : , 1], marker=TJ_NPFG_MARKER_TYPE, label=TJ_NPFG_BF_STRIPPED_LABEL, color=TJ_NPFG_BF_STRIPPED_COLOR)
     ax_V_orthogonal.axvline(tj_npfg_track_error_boundary, ymin=np.min(track_error_range), ymax=np.max(track_error_range), color=TJ_NPFG_BF_STRIPPED_COLOR, linestyle=TJ_NPFG_TRACK_ERROR_BOUNDARY_STYLE)
+
+    # TJ NPFG BF Cartesian V_approach_min Velocity curves
+    ax_V_parallel.plot(np.abs(track_error_range), grid_data[PF_ALGORITHM_TJ_NPFG_CARTESIAN_V_APPROACH_MIN_IDX, : , 0], marker=TJ_NPFG_MARKER_TYPE, label=TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_LABEL, color=TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_COLOR)
+    ax_V_parallel.axvline(tj_npfg_cartesian_v_approach_min.get_track_error_boundary(), ymin=np.min(track_error_range), ymax=np.max(track_error_range), color=TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_COLOR, linestyle=TJ_NPFG_TRACK_ERROR_BOUNDARY_STYLE)
+    ax_V_orthogonal.plot(np.abs(track_error_range), grid_data[PF_ALGORITHM_TJ_NPFG_CARTESIAN_V_APPROACH_MIN_IDX, : , 1], marker=TJ_NPFG_MARKER_TYPE, label=TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_LABEL, color=TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_COLOR)
+    ax_V_orthogonal.axvline(tj_npfg_cartesian_v_approach_min.get_track_error_boundary(), ymin=np.min(track_error_range), ymax=np.max(track_error_range), color=TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_COLOR, linestyle=TJ_NPFG_TRACK_ERROR_BOUNDARY_STYLE)
+
+    # Velocity constraints plot
+    VEL_CONSTRAINTS_PLOT_STYLE = 'dashed'
+
+    APPROACH_SPEED_MINIMUM_LABEL = 'V_approach_minimum'
+    ax_V_orthogonal.axhline(APPROACH_SPEED_MINIMUM_DEFAULT, xmin=np.min(track_error_range), xmax=np.max(track_error_range), color='grey', linestyle=VEL_CONSTRAINTS_PLOT_STYLE, label=APPROACH_SPEED_MINIMUM_LABEL)
+
+    PATH_DESIRED_SPEED_LABEL = 'V_path'
+    ax_V_parallel.axhline(PATH_DESIRED_SPEED, xmin=np.min(track_error_range), xmax=np.max(track_error_range), color='grey', linestyle=VEL_CONSTRAINTS_PLOT_STYLE, label=PATH_DESIRED_SPEED_LABEL)
 
     # Debug
     print('TJ NPFG Track error boundary: {}m'.format(tj_npfg_track_error_boundary))

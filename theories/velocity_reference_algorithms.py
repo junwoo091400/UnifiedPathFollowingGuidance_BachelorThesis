@@ -54,12 +54,12 @@ class VelocityReferenceCurves:
         assert self.max_acc_xy > 0
         assert self.max_jerk_xy > 0
 
-    def assert_input_variables(self, track_error, desired_speed):
+    def assert_input_variables(self, track_error, v_path):
         assert track_error >= 0
-        assert desired_speed >= 0
-        assert desired_speed >= self.vel_range[0] and desired_speed <= self.vel_range[2]
+        assert v_path >= 0
+        assert v_path >= self.vel_range[0] and v_path <= self.vel_range[2]
 
-    def calculate_velRef(self, track_error, desired_speed):
+    def calculate_velRef(self, track_error, v_path):
         '''
         Main function to calculate the velocity reference
 
@@ -86,7 +86,7 @@ class TjNpfg(VelocityReferenceCurves):
         from windywings.libs.npfg import NPFG
         self.npfg = NPFG(vel_range[1], vel_range[2]) # Create NPFG instance
 
-    def calculate_velRef(self, track_error, desired_speed):
+    def calculate_velRef(self, track_error, v_path):
         '''
         Returns velocity reference, as defined in TJ's NPFG
 
@@ -94,7 +94,7 @@ class TjNpfg(VelocityReferenceCurves):
         - Velocity of vehicle is always in X-axis direction (doesn't affect NPFG calculation)
         - Position of vehicle is at (0, pos_y)
         '''
-        self.assert_input_variables(track_error, desired_speed)
+        self.assert_input_variables(track_error, v_path)
 
         # Augmented position of the vehicle from the track error. We place vehicle on y < 0 coordinate, under the line (y == 0)
         vehicle_pos = PATH_POSITION + track_error * np.array([0.0, -1.0])
@@ -126,13 +126,13 @@ class TjNpfgBearingFeasibilityStripped(TjNpfg):
 
     # Constructor is shared with TjNpfg class
 
-    def calculate_velRef(self, track_error, desired_speed):
+    def calculate_velRef(self, track_error, v_path):
         '''
         Returns velocity reference, bypassing bearing feasibility calculation
 
         Basically replaces the `guideToPath_nowind` function.
         '''
-        self.assert_input_variables(track_error, desired_speed)
+        self.assert_input_variables(track_error, v_path)
 
         # Constants
         NEGATIVE_TRACK_ERROR_AUGMENT = -1.0 # Augmented signed track error to have an effect of vehicle being at 'right' side of the path. Used in `bearingVec` func of NPFG
@@ -174,11 +174,86 @@ class RuckigTimeOptimalTrajectory(VelocityReferenceCurves):
     of the look-up table formulated initially from the track error boundary condition assumption.
     '''
     def __init__(self, vel_range, max_acc, max_jerk):
-        super().init(vel_range, max_acc, max_jerk)
+        super().__init__(vel_range, max_acc, max_jerk)
 
         # Calculate the track error boundary directly
         # We assume vehicle heading orthogonal to the path at MAXIMUM velocity, then slowing down
 
-    def calculate_velRef(self, track_error, desired_speed):
+    def calculate_velRef(self, track_error, v_path):
         # Orthogonal velocity follows a simple 
         return None
+
+class TjNpfgCartesianlVapproachMin(TjNpfg):
+    '''
+    On top of TJ's NPFG:
+    - Includes 'V_approach_min', which guarantees that vehicles approaches the path at minimum this (ground) speed
+    - Decoupled orthogonal/parallel velocity reference relative to unit path tangent vector
+
+    Decoupled logic:
+    - If our velocity on path (v_path) is below the V_approach, we should behave in decoupled orthogonal/parallel logic
+    - If the v_path is higher than V_approach, just consider it as a fixed-wing NPFG with nominal speed of v_path (since it's high enough)
+
+    NOTE: We don't use the `ground_speed` variable, as we want to decouple that from the definition of v_approach, which should only
+    be about the 'orthogonal' velocity component to the path tangent
+    '''
+    def __init__(self, vel_range, max_acc, max_jerk, v_approach_min):
+        GROUND_SPEED_DUMMY = vel_range[1] # We won't be using this part of the algorithm. Put any sane value in.
+        super().__init__(vel_range, max_acc, max_jerk, GROUND_SPEED_DUMMY)
+        self.v_approach_min = v_approach_min
+
+    def calculate_velRef(self, track_error, v_path, v_approach):
+        '''
+        Depending on (track_error, v_approach), draw different VF
+
+        v_approach: Desired approaching speed (should ideally be user-configurable, or somehow set to constant by vehicle's actual approach speed)
+
+        One challenge is that v_approach changes across the track_error (if we constantly use vehicle's state to determine the value), and hence
+        the VF will constantly change while approaching the path
+        '''
+        # Constants
+        NEGATIVE_TRACK_ERROR_AUGMENT = -1.0 # Augmented signed track error to have an effect of vehicle being at 'right' side of the path. Used in `bearingVec` func of NPFG
+        ZERO_FEASIBILITY_COMBINED_AUGMENT = 0.0 # Augmented combined feasibility, to disable effect of feasibility in scaling in `minGroundSpeed` of NPFG
+
+        if v_approach > self.v_approach_min:
+            # High speed approach, treat like TJ's native NPFG
+
+            # Set vehicle nominal speed to v_path (velocity on path)
+            self.npfg.airspeed_nom = v_path
+
+            # NOTE: The setting of airpseed_nom to a sane positive value higher than NPFG's airspeed buffer
+            # is what allows us to bypass the problem of coupling on bearing Feasibility function slowing down vehicle
+            # when approaching the path (e.g. Multicopter with Vnom = 0)
+
+            self.track_error_bound = self.npfg.trackErrorBound(v_approach, self.npfg.time_const)
+            normalized_track_error = np.clip(track_error/self.track_error_bound, 0.0, 1.0)
+            
+            look_ahead_ang = self.npfg.lookAheadAngle(normalized_track_error) # LAA solely based on track proximity (normalized)
+            track_proximity = self.npfg.trackProximity(look_ahead_ang)
+            bearing_vector = self.npfg.bearingVec(PATH_UNIT_TANGENT_VEC, look_ahead_ang, NEGATIVE_TRACK_ERROR_AUGMENT)
+            minimum_groundspeed_reference = self.npfg.minGroundSpeed(normalized_track_error, ZERO_FEASIBILITY_COMBINED_AUGMENT)
+
+            # X, Y component. Should represent Parallel and Orthogonal components of reference velocity curve
+            return self.npfg.refAirVelocity(bearing_vector, minimum_groundspeed_reference)
+        else:
+            # Low speed approach, we need to clip the approach speed curve to respect minimum speed
+            # NOTE: We don't use any parameters related to nominal airspeed, etc in TJ NPFG
+
+            self.track_error_bound = self.npfg.trackErrorBound(self.v_approach_min, self.npfg.time_const)
+            normalized_track_error = np.clip(track_error/self.track_error_bound, 0.0, 1.0)
+            
+            look_ahead_ang = self.npfg.lookAheadAngle(normalized_track_error) # LAA solely based on track proximity (normalized)
+
+            # Track proximity starts from 0, and reaches 1 when on path
+            track_proximity = np.sin(look_ahead_ang)
+            # track_proximity = self.npfg.trackProximity(look_ahead_ang)
+            # track_proximity = np.sqrt(track_proximity) # We remove the squared component, to make the curve stiffer at origin (to drive V_orthogonal stepper to the path)
+
+            # Simply apply ramp-in & ramp-out on the Vpath and Vapproach
+            v_parallel = v_path * track_proximity
+            v_orthogonal = self.v_approach_min * (1 - track_proximity)
+            
+            # Parallel, Orthogonal vel component
+            return np.array([v_parallel, v_orthogonal])
+
+    def get_track_error_boundary(self):
+        return self.track_error_bound
