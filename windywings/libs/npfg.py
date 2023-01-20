@@ -54,6 +54,11 @@ class NPFG:
         self.d_lateral_accel_no_curve = 0.0
         self.d_closest_point_on_path = np.array([0.0, 0.0])
 
+    def set_track_keeping_speed(self, track_keeping_speed):
+        ''' Set maximum value for minimum ground speed '''
+        assert self.airspeed_max >= track_keeping_speed # Clip to sane range (assuming no wind)
+        self.max_min_ground_speed_track_keeping = track_keeping_speed
+
     def trackErrorBound(self, ground_speed, time_constant):
         """ Calculates continuous ground track error bound depending on ground speed """
         assert np.shape(ground_speed) == ( ), "Ground speed : {}, shape: {}".format(ground_speed, np.shape(ground_speed))
@@ -238,7 +243,7 @@ class NPFG:
         self.air_vel_ref = self.refAirVelocity(bearing_vector, minimum_groundspeed_reference)
 
         # Debug output
-        print('Feas combined: {:.2f}, Normalized Track error: {:.2f}, Min groundspeed:{:.1f}'.format(feas_combined, normalized_track_error, minimum_groundspeed_reference))
+        # print('Feas combined: {:.2f}, Normalized Track error: {:.2f}, Min groundspeed:{:.1f}'.format(feas_combined, normalized_track_error, minimum_groundspeed_reference))
 
         # OUTPUT
         lateral_accel = self.lateralAccel(air_vel, self.air_vel_ref)
