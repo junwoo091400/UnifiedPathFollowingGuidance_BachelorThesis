@@ -76,7 +76,7 @@ class VelocityReferenceCurves:
         assert False, "get_track_error_boundary of base class shouldn't be used directly!"
 
 class TjNpfg(VelocityReferenceCurves):
-    def __init__(self, vel_range, max_acc, max_jerk, ground_speed):
+    def __init__(self, vel_range, max_acc, max_jerk, ground_speed, track_keeping_speed):
         # Initialize class
         super().__init__(vel_range, max_acc, max_jerk)
         self.ground_speed = ground_speed # Additional argument for TJ NPFG, stays constant
@@ -85,6 +85,9 @@ class TjNpfg(VelocityReferenceCurves):
         # Construct NPFG instance
         from windywings.libs.npfg import NPFG
         self.npfg = NPFG(vel_range[1], vel_range[2]) # Create NPFG instance
+
+        # Set track keeping speed
+        self.npfg.set_track_keeping_speed(track_keeping_speed)
 
     def calculate_velRef(self, track_error, v_path):
         '''
@@ -198,7 +201,12 @@ class TjNpfgCartesianlVapproachMin(TjNpfg):
     '''
     def __init__(self, vel_range, max_acc, max_jerk, v_approach_min):
         GROUND_SPEED_DUMMY = vel_range[1] # We won't be using this part of the algorithm. Put any sane value in.
-        super().__init__(vel_range, max_acc, max_jerk, GROUND_SPEED_DUMMY)
+
+        # NOTE: Ideally, when we use legacy NPFG logic (V_path > V_approach), track-keeping part shouldn't interfere.
+        # This was done mostly to do control consistent when using cartesian velocity formulation (where track keeping isn't considered yet)
+        TRACK_KEEPING_SPEED_DUMMY = 0 # We don't use track keeping feature, so set it as dummy value of 0
+        
+        super().__init__(vel_range, max_acc, max_jerk, GROUND_SPEED_DUMMY, TRACK_KEEPING_SPEED_DUMMY)
         self.v_approach_min = v_approach_min
 
     def calculate_velRef(self, track_error, v_path):
@@ -250,7 +258,7 @@ class TjNpfgCartesianlVapproachMin(TjNpfg):
 
             # Simply apply ramp-in & ramp-out on the Vpath and Vapproach
             v_parallel = v_path * track_proximity
-            v_orthogonal = v_approach * (1 - track_proximity)
+            v_orthogonal = v_approach * np.cos(look_ahead_ang) # Doing (1 - sin) gives lower stiffness (as sine curve flattens out around PI/2). So use cosine instead.
             
             # Parallel, Orthogonal vel component
             return np.array([v_parallel, v_orthogonal])

@@ -26,10 +26,12 @@ TRACK_ERROR_MAX = 80 # [m] Maximum track error we simulate (in Y-direction, as p
 GRID_SIZE = 1.0 # [m] Interval that data will be calculated along track error axis
 
 # User adjustable
-VELOCITY_RANGE_DEFAULT = np.array([0.0, 10.0, 12.0]) # Arbitrary min, nom and max speed
+VELOCITY_RANGE_DEFAULT = np.array([0.0, 2.0, 12.0]) # Arbitrary min, nom and max speed
 PATH_DESIRED_SPEED = 7.0 # [m/s] Desired speed on path
 APPROACH_SPEED_MINIMUM_DEFAULT = 3.0
-GROUND_SPEED_DEFAULT = 2.0 # Only should be used by TJ NPFG
+
+GROUND_SPEED_DEFAULT = 5.0 # Only should be used by TJ NPFG
+TJ_NPFG_TRACK_KEEPING_SPD = 5.0 # Max minimum track keeping ground speed variable (only for TJ NPFG derived algorithms)
 
 # Not used for now
 MAX_ACC_DEFAULT = 10.0 # Default max acc value [m/s^2]
@@ -50,8 +52,8 @@ def main():
     grid_data = np.empty((PF_ALGORITHMS_COUNT, track_error_len, 2))
 
     # Instances for each algorithms
-    tj_npfg = TjNpfg(VELOCITY_RANGE_DEFAULT, MAX_ACC_DEFAULT, MAX_JERK_DEFAULT, GROUND_SPEED_DEFAULT)
-    tj_npfg_bf_stripped = TjNpfgBearingFeasibilityStripped(VELOCITY_RANGE_DEFAULT, MAX_ACC_DEFAULT, MAX_JERK_DEFAULT, GROUND_SPEED_DEFAULT)
+    tj_npfg = TjNpfg(VELOCITY_RANGE_DEFAULT, MAX_ACC_DEFAULT, MAX_JERK_DEFAULT, GROUND_SPEED_DEFAULT, TJ_NPFG_TRACK_KEEPING_SPD)
+    tj_npfg_bf_stripped = TjNpfgBearingFeasibilityStripped(VELOCITY_RANGE_DEFAULT, MAX_ACC_DEFAULT, MAX_JERK_DEFAULT, GROUND_SPEED_DEFAULT, TJ_NPFG_TRACK_KEEPING_SPD)
     tj_npfg_cartesian_v_approach_min = TjNpfgCartesianlVapproachMin(VELOCITY_RANGE_DEFAULT, MAX_ACC_DEFAULT, MAX_JERK_DEFAULT, APPROACH_SPEED_MINIMUM_DEFAULT)
 
     # Calculation for Visualization
@@ -133,9 +135,13 @@ def main():
     PATH_DESIRED_SPEED_LABEL = 'V_path'
     ax_V_parallel.axhline(PATH_DESIRED_SPEED, xmin=np.min(track_error_range), xmax=np.max(track_error_range), color='grey', linestyle=VEL_CONSTRAINTS_PLOT_STYLE, label=PATH_DESIRED_SPEED_LABEL)
 
+    TJ_NPFG_TRACK_KEEPING_SPD_LABEL = 'V_tk'
+    TJ_NPFG_TRACK_KEEPING_SPD_COLOR = 'orange'
+    ax_V_orthogonal.axhline(TJ_NPFG_TRACK_KEEPING_SPD, xmin=np.min(track_error_range), xmax=np.max(track_error_range), color=TJ_NPFG_TRACK_KEEPING_SPD_COLOR, linestyle=VEL_CONSTRAINTS_PLOT_STYLE, label=TJ_NPFG_TRACK_KEEPING_SPD_LABEL)
+
     # Debug
-    print('TJ NPFG Track error boundary: {}m'.format(tj_npfg_track_error_boundary))
-    print('Diff in Vel ref (stripped - TJ NPFG):', grid_data[PF_ALGORITHM_TJ_NPFG_BF_STRIPPED_IDX, : , 0] - grid_data[PF_ALGORITHM_TJ_NPFG_IDX, : , 0])
+    # print('TJ NPFG Track error boundary: {}m'.format(tj_npfg_track_error_boundary))
+    # print('Diff in Vel ref (stripped - TJ NPFG):', grid_data[PF_ALGORITHM_TJ_NPFG_BF_STRIPPED_IDX, : , 0] - grid_data[PF_ALGORITHM_TJ_NPFG_IDX, : , 0])
 
     # Legend
     ax_V_parallel.legend()
