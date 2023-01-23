@@ -126,9 +126,8 @@ def main():
     ax_V_parallel.fill_between(track_error_range, VELOCITY_RANGE_DEFAULT[0], VELOCITY_RANGE_DEFAULT[1], color=V_NOM_COLOR)
     ax_V_orthogonal.fill_between(track_error_range, VELOCITY_RANGE_DEFAULT[1], VELOCITY_RANGE_DEFAULT[2], color=V_MAX_COLOR)
     ax_V_parallel.fill_between(track_error_range, VELOCITY_RANGE_DEFAULT[1], VELOCITY_RANGE_DEFAULT[2], color=V_MAX_COLOR)
-    # ax_V_orthogonal.axhline(VELOCITY_RANGE_DEFAULT[1], xmin=np.min(track_error_range), xmax=np.max(track_error_range), color=V_NOM_COLOR, linestyle=VEL_CONSTRAINTS_PLOT_STYLE, label=V_NOM_LABEL)
-    # ax_V_parallel.axhline(VELOCITY_RANGE_DEFAULT[1], xmin=np.min(track_error_range), xmax=np.max(track_error_range), color=V_NOM_COLOR, linestyle=VEL_CONSTRAINTS_PLOT_STYLE, label=V_NOM_LABEL)
 
+    # Velocity cutoff range draw
     APPROACH_SPEED_MINIMUM_LABEL = 'V_approach_minimum'
     ax_V_orthogonal.axhline(APPROACH_SPEED_MINIMUM_DEFAULT, xmin=np.min(track_error_range), xmax=np.max(track_error_range), color='grey', linestyle=VEL_CONSTRAINTS_PLOT_STYLE, label=APPROACH_SPEED_MINIMUM_LABEL)
 
@@ -139,51 +138,51 @@ def main():
     TJ_NPFG_TRACK_KEEPING_SPD_COLOR = 'orange'
     ax_V_orthogonal.axhline(TJ_NPFG_TRACK_KEEPING_SPD, xmin=np.min(track_error_range), xmax=np.max(track_error_range), color=TJ_NPFG_TRACK_KEEPING_SPD_COLOR, linestyle=VEL_CONSTRAINTS_PLOT_STYLE, label=TJ_NPFG_TRACK_KEEPING_SPD_LABEL)
 
-    # Debug
-    # print('TJ NPFG Track error boundary: {}m'.format(tj_npfg_track_error_boundary))
-    # print('Diff in Vel ref (stripped - TJ NPFG):', grid_data[PF_ALGORITHM_TJ_NPFG_BF_STRIPPED_IDX, : , 0] - grid_data[PF_ALGORITHM_TJ_NPFG_IDX, : , 0])
-
     # Legend
     ax_V_parallel.legend()
     ax_V_orthogonal.legend()
+
+    ## Vector Field Drawing
+    ax_VF = fig.add_subplot(3, 1, 3) # Lowest
+
+    # Draw the path to follow (Y+ direction, passing through origin)
+    ax_VF.axvline(0.0, ymin=np.min(track_error_range), ymax=np.max(track_error_range), color='dimgray', linestyle='dotted')
+    ax_VF.set_title('Vector Field (Path = +Y direction, passing through origin)')
+
+    VF_Y_MAX = 5.0 # Maximum (both negative & positive direction) of where the Vector's origins will be located
+    VF_Y_RANGE = np.linspace(-VF_Y_MAX, VF_Y_MAX, PF_ALGORITHMS_COUNT) # Equally divide the range for each algorithm
+    VF_Y_BUFFER = 2.0 # Buffer [m] to have in Y-axis range
+    # VF_VEC_LENGTH = 8 # How much Y-coordinate a single vector can consume (for adjusting spacing & y limits to display)
+
+    VF_SUBSAMPLE_RATIO = 5 # Select only 1 in this ratio number of samples, to reduce clutter
+    VF_TRACK_ERROR_IDXS = range(0, track_error_len, VF_SUBSAMPLE_RATIO)
+
+    # Meshgrid must be indexed in matrix form xy, returning shape of (len(algorithms), len(track_error_range)).
+    # Meshgrid indexed via 'ij', returning algorithms on the 2nd axis, which is helpful for setting colors (as they apply to 2nd axis)
+    VF_X_ORIGINS, VF_Y_ORIGINS = np.meshgrid(track_error_range[VF_TRACK_ERROR_IDXS], VF_Y_RANGE, indexing='ij')
+    
+    # We 'swap' the axis, to make algorithm index go to 2nd index, since color scheme applies that way & meshgrid follows that convention
+    # X is V_orthogonal * -1, which is -grid[1]
+    VF_X_VALUES = np.swapaxes(-grid_data[:, VF_TRACK_ERROR_IDXS, 1], 0, 1)
+    # Y is V_parallel, if we assume following path in Y+ direction, which is grid[0]
+    VF_Y_VALUES = np.swapaxes(grid_data[:, VF_TRACK_ERROR_IDXS, 0], 0, 1)
+
+    # Draw the vectors
+    # Scale = 1.0 (identical to m/s).  headlength=2.0, headaxislength=1.5, `units` affects the arrow HEAD & WIDTH size.
+    ax_VF.quiver(VF_X_ORIGINS, VF_Y_ORIGINS, VF_X_VALUES, VF_Y_VALUES, scale=1.0, scale_units='xy', units='height', width=0.015, color=[TJ_NPFG_LINE_COLOR, TJ_NPFG_BF_STRIPPED_COLOR, TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_COLOR])
+
+    # # Draw the track error boundary
+    ax_VF.axvline(tj_npfg_track_error_boundary, ymin=np.min(track_error_range), ymax=np.max(track_error_range), color=TJ_NPFG_TRACK_ERROR_BOUNDARY_COLOR, linestyle=TJ_NPFG_TRACK_ERROR_BOUNDARY_STYLE)
+    ax_VF.axvline(tj_npfg_track_error_boundary, ymin=np.min(track_error_range), ymax=np.max(track_error_range), color=TJ_NPFG_BF_STRIPPED_COLOR, linestyle=TJ_NPFG_TRACK_ERROR_BOUNDARY_STYLE)
+    ax_VF.axvline(tj_npfg_cartesian_v_approach_min.get_track_error_boundary(), ymin=np.min(track_error_range), ymax=np.max(track_error_range), color=TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_COLOR, linestyle=TJ_NPFG_TRACK_ERROR_BOUNDARY_STYLE)
+
+    # Set Y-limit to cover worst case scenario range
+    ax_VF.set_ylim(np.min(VF_Y_RANGE)+np.min(VF_Y_VALUES)-VF_Y_BUFFER, np.max(VF_Y_RANGE)+np.max(VF_Y_VALUES)+VF_Y_BUFFER)
+    # ax_VF.set_ylim(np.min(VF_Y_RANGE)-VF_VEC_LENGTH, np.max(VF_Y_RANGE)+VF_VEC_LENGTH)
+    ax_VF.grid()
     
     fig.tight_layout() # Make sure graphs don't overlap
     plt.show()
-
-    ## Vector Field Drawing
-    # ax_VF = fig.add_subplot(2, 1, 2) # Lower
-
-    # # Draw the track error boundary
-    # ax_VF.hlines(tj_npfg_track_error_boundary, xmin=np.min(grid_xrange), xmax=np.max(grid_xrange), colors=TJ_NPFG_TRACK_ERROR_BOUNDARY_COLOR, linestyles=TJ_NPFG_TRACK_ERROR_BOUNDARY_STYLE)
-    # ax_VF.hlines(-tj_npfg_track_error_boundary, xmin=np.min(grid_xrange), xmax=np.max(grid_xrange), colors=TJ_NPFG_TRACK_ERROR_BOUNDARY_COLOR, linestyles=TJ_NPFG_TRACK_ERROR_BOUNDARY_STYLE)
-
-    # # Meshgrid must be indexed in matrix form (i, j), so to have the ROW be constant X values (as in data bucket)
-    # # Normalized y-range, for better sync (visualization) with the velocity curve
-    # grid_yrange_normalized = grid_yrange / tj_npfg_track_error_boundary
-
-    # X, Y = np.meshgrid(grid_xrange, grid_yrange_normalized, indexing='ij')
-    # vx = grid_data[:, :, 0]
-    # vy = grid_data[:, :, 1]
-    # ax_VF.quiver(X, Y, vx, vy, color='b')
-
-    # ax_VF.set_title('Va_ref VF of NPFG. Vg={:.1f}, Vnom={:.1f}'.format(GROUND_SPEED_DEFAULT, VELOCITY_RANGE_DEFAULT[1]))
-    # ax_VF.set_xlim(np.min(grid_xrange), np.max(grid_xrange))
-    # ax_VF.set_ylim(np.min(grid_yrange_normalized), np.max(grid_yrange_normalized) + GRID_SIZE/2) # Make sure the top (Y=0) vectors get shown, by increasing Ymax range
-    # ax_VF.set_ylabel('Normalized position')
-    # ax_VF.grid()
-
-    # # https://stackoverflow.com/questions/45423166/matplotlib-share-xaxis-with-yaxis-from-another-plot
-    # # https://stackoverflow.com/questions/31490436/matplotlib-finding-out-xlim-and-ylim-after-zoom
-    # def on_normalized_path_error_bound_changed(event_ax):
-    #     normalized_path_error_bound = np.array(event_ax.get_xlim())
-    #     # Multiply -1, to negative y range, as we are only visualizing (y < 0) portion
-    #     # Also flip the array, so that we actually have [A, B] bound where A < B.
-    #     ax_VF.set_ylim(-np.flip(normalized_path_error_bound))
-
-    # # Connect hook when user zooms onto specific normalized path error (X-axis of the Velocity Curve Plot)
-    # ax_V_parallel.callbacks.connect('xlim_changed', on_normalized_path_error_bound_changed)
-
-    # plt.show()
 
     print('Main function exiting ...')
 
