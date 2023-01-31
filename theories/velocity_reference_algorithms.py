@@ -20,6 +20,10 @@ import numpy as np
 # Constants
 VELOCITY_RANGE_SHAPE = (3,)
 
+# Junk variables
+MAX_ACC_DEFAULT = 0.1
+MAX_JERK_DEFAULT = 0.1
+
 # Helper constants (for virtual path to follow, for some 2D algorithms)
 PATH_POSITION = np.array([0, 0])
 PATH_UNIT_TANGENT_VEC = np.array([1.0, 0.0])
@@ -37,13 +41,12 @@ class VelocityReferenceCurves:
     Optional:
     - Maximum Acceleration (assuming point-mass model, applies for XY component in total)
     - Maximum Jerk [m/s^3]
-
     ---
 
     Output:
     - Velocity reference vector [parallel, orthogonal (to path)] in [m/s] (always positive)
     '''
-    def __init__(self, vel_range, max_acc, max_jerk):
+    def __init__(self, vel_range, max_acc=MAX_ACC_DEFAULT, max_jerk=MAX_JERK_DEFAULT):
         self.vel_range = vel_range
         self.max_acc_xy = max_acc
         self.max_jerk_xy = max_jerk
@@ -66,6 +69,14 @@ class VelocityReferenceCurves:
         This needs to be different for each method derived from this base class
         '''
         assert False, "calculate_velRef of base class shouldn't be used directly!"
+
+    def calculate_velRef_array(self, track_error_range, v_path):
+        '''
+        Convenience function to return velRef curve for given track error range in to a list
+
+        [[Parallel Vel Curve], [Orthogonal Vel Curve]] form
+        '''
+        return np.stack([self.calculate_velRef(e, v_path) for e in track_error_range], axis=1)
 
     def get_track_error_boundary(self):
         '''
@@ -93,9 +104,7 @@ class TjNpfg(VelocityReferenceCurves):
         '''
         Returns velocity reference, as defined in TJ's NPFG
 
-        NOTE
-        - Velocity of vehicle is always in X-axis direction (doesn't affect NPFG calculation)
-        - Position of vehicle is at (0, pos_y)
+        NOTEtrack_errort (0, pos_y)
         '''
         self.assert_input_variables(track_error, v_path)
 
@@ -225,7 +234,7 @@ class TjNpfgCartesianlVapproachMin(TjNpfg):
         # Set the approach speed
         v_approach = np.max([self.v_approach_min, self.vel_range[1], v_path])
 
-        if v_path > v_approach:
+        if v_path >= v_approach:
             # High speed approach, treat like TJ's native NPFG. Unicyclic ramp-in.
             # Set vehicle nominal speed to v_path (velocity on path)
             self.npfg.airspeed_nom = v_path
@@ -265,3 +274,108 @@ class TjNpfgCartesianlVapproachMin(TjNpfg):
 
     def get_track_error_boundary(self):
         return self.track_error_bound
+
+class MaxAccelCartesianVelCurve(VelocityReferenceCurves):
+    def __init__(self, vel_range, max_acc_orth, max_acc_parallel, v_approach_min):
+        super().__init__(vel_range)
+
+        # Custom parameters
+        self.max_acc_orth = max_acc_orth
+        self.max_acc_parallel = max_acc_parallel
+        self.v_approach_min = v_approach_min
+
+        # Runtime variable
+        self.track_error_boundary = -1.0
+        self.e_min_approach = -1.0
+        self.e_min_path = -1.0
+        self.v_approach = -1.0
+
+    def calculate_e_min_approach_for_S_orth_max_acc(self, v_approach, max_acc_orth):
+        '''
+        Minimum track error boundary to bring V_approach to 0 with given maximum orthogonal acceleration
+        '''
+        return np.square(v_approach)/(2*max_acc_orth)
+
+    def calculate_S_orth_max_acc(self, v_approach, max_acc_orth, track_error_range):
+        '''
+        Calculate maximum acceleration orthogonal velocity curve
+
+        X: cross track error
+        Y: orthogonal velocity
+        '''
+        self.e_min_approach = self.calculate_e_min_approach_for_S_orth_max_acc(v_approach, max_acc_orth)
+        return np.piecewise(track_error_range, [track_error_range < self.e_min_approach, track_error_range >= self.e_min_approach], [lambda e : np.sqrt(2*max_acc_orth*e), v_approach])
+
+    def calculate_relaxed_S_orth(self, v_approach, max_acc_orth, relaxed_track_error_bound, track_error_range):
+        '''
+        Calculate relaxed maximum acceleration orthogonal velocity curve
+
+        X: cross track error
+        Y: orthogonal velocity
+        '''
+        self.e_min_approach = self.calculate_e_min_approach_for_S_orth_max_acc(v_approach, max_acc_orth)
+        assert relaxed_track_error_bound >= self.e_min_approach, "Relaxed track error bound must be bigger than e_min_approach!"
+        return np.piecewise(track_error_range, [track_error_range < relaxed_track_error_bound, track_error_range >= relaxed_track_error_bound], [lambda e : v_approach * np.sqrt(e/relaxed_track_error_bound), v_approach])
+
+    def calculate_e_min_path_for_relaxed_S_orth_max_acc(self, v_path, max_acc_parallel, v_approach, track_error_bound):
+        '''
+        Minimum track error boundary to ramp in parallel velocity to V_path, with given relaxed (could be max-acc as well) orthogonal velocity curve
+        '''
+        return np.square(v_path*v_approach/(2*max_acc_parallel))/track_error_bound
+
+    def calculate_S_parallel_max_acc_with_relaxed_S_orth(self, v_path, max_acc_parallel, track_error_range, v_approach, track_error_bound):
+        '''
+        Calculate maximum acceleration parallel velocity curve
+
+        NOTE: As non-polynomial functions can't be defined in numpy directly, this has
+        dependency to already calculated orthogonal velocity curve!
+
+        It takes track error bound input from the orthogonal velocity curve. And must produce
+        a curve with track error bound 'smaller' than the orthogonal curve's!
+
+        X: cross track error
+        Y: parallel velocity
+        '''
+        self.e_min_path = self.calculate_e_min_path_for_relaxed_S_orth_max_acc(v_path, max_acc_parallel, v_approach, track_error_bound)
+        assert self.e_min_path <= track_error_bound, "Minimum track error boundary for achieving V_path must be smaller than track error bound of orthogonal velocity curve!"
+        return np.piecewise(track_error_range, [track_error_range < self.e_min_path, track_error_range >= self.e_min_path], [lambda e : v_path - (2*max_acc_parallel*np.sqrt(track_error_bound)/v_approach)*np.sqrt(e), 0])
+
+    def calculate_relaxed_S_parallel_max_acc_with_relaxed_S_orth(self, v_path, max_acc_parallel, track_error_range, v_approach, track_error_bound):
+        '''
+        Calculate relaxed maximum acceleration parallel velocity curve
+
+        NOTE: As non-polynomial functions can't be defined in numpy directly, this has
+        dependency to already calculated orthogonal velocity curve!
+
+        It takes track error bound input from the orthogonal velocity curve. And must produce
+        a curve with track error bound 'smaller' than the orthogonal curve's!
+
+        X: cross track error
+        Y: parallel velocity
+        '''
+        self.e_min_path = self.calculate_e_min_path_for_relaxed_S_orth_max_acc(v_path, max_acc_parallel, v_approach, track_error_bound)
+        assert self.e_min_path <= track_error_bound, "Minimum track error boundary for achieving V_path must be smaller than track error bound of orthogonal velocity curve!"
+        return np.piecewise(track_error_range, [track_error_range < track_error_bound, track_error_range >= track_error_bound], [lambda e : v_path*(1-np.sqrt(e/track_error_bound)), 0])
+
+    def calculate_velRef_array(self, track_error, v_path):
+        '''
+        Calculate semi-relaxed track error boundary with 
+        '''
+        self.v_approach = np.max([self.vel_range[1], self.v_approach_min, v_path])
+
+        # Calculate most aggressive track error boundary for given V_approach
+        e_min_approach = self.calculate_e_min_approach_for_S_orth_max_acc(self.v_approach, self.max_acc_orth)
+        # Calculate most aggressive track error boundary for given V_path, with max acc orthogonal velocity curve (e_min_approach)
+        e_min_path = self.calculate_e_min_path_for_relaxed_S_orth_max_acc(v_path, self.max_acc_parallel, self.v_approach, e_min_approach)
+    
+        # Choose the bigger track error boundary (physical lower limit)
+        self.track_error_boundary = np.max([e_min_approach, e_min_path])
+
+        # Calculate velocity curves
+        S_orth = self.calculate_relaxed_S_orth(self.v_approach, self.max_acc_orth, self.track_error_boundary, track_error)
+        S_parallel = self.calculate_relaxed_S_parallel_max_acc_with_relaxed_S_orth(v_path, self.max_acc_parallel, track_error, self.v_approach, self.track_error_boundary)
+
+        return np.array([S_parallel, S_orth])
+
+    def get_track_error_boundary(self):
+        return self.track_error_boundary
