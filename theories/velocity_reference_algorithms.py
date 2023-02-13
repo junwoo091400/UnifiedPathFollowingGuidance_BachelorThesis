@@ -39,6 +39,7 @@ def velocity_array_to_parallel_position_array(velocity_arrays, track_error_range
     Input: Velocity reference vector [parallel, orthogonal (to path)] in [m/s] (always positive)
     Output: [[Final parallel position, min(track_error_range)], ... [0, max(track_error_range)]]
     '''
+    
 
 class VelocityReferenceCurves:
     '''
@@ -110,7 +111,7 @@ class VelocityReferenceCurves:
         assert False, "get_track_error_boundary of base class shouldn't be used directly!"
 
 class TjNpfg(VelocityReferenceCurves):
-    def __init__(self, vel_range, max_acc, max_jerk, ground_speed, track_keeping_speed):
+    def __init__(self, vel_range, ground_speed, track_keeping_speed, max_acc=MAX_ACC_DEFAULT, max_jerk=MAX_JERK_DEFAULT):
         # Initialize class
         super().__init__(vel_range, max_acc, max_jerk)
         self.ground_speed = ground_speed # Additional argument for TJ NPFG, stays constant
@@ -122,6 +123,10 @@ class TjNpfg(VelocityReferenceCurves):
 
         # Set track keeping speed
         self.npfg.set_track_keeping_speed(track_keeping_speed)
+        self.npfg.min_ground_speed = 0.0 # To enable track keeping, remove min ground speed constraint
+
+    def set_ground_speed(self, ground_speed):
+        self.ground_speed = ground_speed
 
     def calculate_velRef(self, track_error, v_path):
         '''
@@ -231,14 +236,14 @@ class TjNpfgCartesianlVapproachMin(TjNpfg):
     NOTE: We don't use the `ground_speed` variable, as we want to decouple that from the definition of v_approach, which should only
     be about the 'orthogonal' velocity component to the path tangent
     '''
-    def __init__(self, vel_range, max_acc, max_jerk, v_approach_min):
+    def __init__(self, vel_range, v_approach_min):
         GROUND_SPEED_DUMMY = vel_range[1] # We won't be using this part of the algorithm. Put any sane value in.
 
         # NOTE: Ideally, when we use legacy NPFG logic (V_path > V_approach), track-keeping part shouldn't interfere.
         # This was done mostly to do control consistent when using cartesian velocity formulation (where track keeping isn't considered yet)
         TRACK_KEEPING_SPEED_DUMMY = 0 # We don't use track keeping feature, so set it as dummy value of 0
         
-        super().__init__(vel_range, max_acc, max_jerk, GROUND_SPEED_DUMMY, TRACK_KEEPING_SPEED_DUMMY)
+        super().__init__(vel_range, GROUND_SPEED_DUMMY, TRACK_KEEPING_SPEED_DUMMY)
         self.v_approach_min = v_approach_min
 
     def calculate_velRef(self, track_error, v_path):

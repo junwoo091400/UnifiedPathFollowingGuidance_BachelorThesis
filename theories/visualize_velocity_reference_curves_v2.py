@@ -27,11 +27,10 @@ GRID_SIZE = 1.0 # [m] Interval that data will be calculated along track error ax
 
 # User adjustable
 VELOCITY_NOM = 10.0
-PATH_DESIRED_SPEED = 10.0 # [m/s] Desired speed on path
+PATH_DESIRED_SPEED = 0.0 # [m/s] Desired speed on path
 APPROACH_SPEED_MINIMUM_DEFAULT = 3.0
 GROUND_SPEED_DEFAULT = 5.0 # Only should be used by TJ NPFG
 TJ_NPFG_TRACK_KEEPING_SPD = 5.0 # Max minimum track keeping ground speed variable (only for TJ NPFG derived algorithms)
-
 MAX_ACC_ORTH = 1.0
 MAX_ACC_PARALLEL = 2.0
 
@@ -86,9 +85,9 @@ def main():
     grid_data = np.empty((PF_ALGORITHMS_COUNT, track_error_len, 2))
 
     # Instances for each algorithms
-    tj_npfg = TjNpfg(VELOCITY_RANGE_DEFAULT, MAX_ACC_DEFAULT, MAX_JERK_DEFAULT, GROUND_SPEED_DEFAULT, TJ_NPFG_TRACK_KEEPING_SPD)
-    tj_npfg_bf_stripped = TjNpfgBearingFeasibilityStripped(VELOCITY_RANGE_DEFAULT, MAX_ACC_DEFAULT, MAX_JERK_DEFAULT, GROUND_SPEED_DEFAULT, TJ_NPFG_TRACK_KEEPING_SPD)
-    tj_npfg_cartesian_v_approach_min = TjNpfgCartesianlVapproachMin(VELOCITY_RANGE_DEFAULT, MAX_ACC_DEFAULT, MAX_JERK_DEFAULT, APPROACH_SPEED_MINIMUM_DEFAULT)
+    tj_npfg = TjNpfg(VELOCITY_RANGE_DEFAULT, GROUND_SPEED_DEFAULT, TJ_NPFG_TRACK_KEEPING_SPD)
+    tj_npfg_bf_stripped = TjNpfgBearingFeasibilityStripped(VELOCITY_RANGE_DEFAULT, GROUND_SPEED_DEFAULT, TJ_NPFG_TRACK_KEEPING_SPD)
+    tj_npfg_cartesian_v_approach_min = TjNpfgCartesianlVapproachMin(VELOCITY_RANGE_DEFAULT, APPROACH_SPEED_MINIMUM_DEFAULT)
     max_accel_relaxed_cartesian = MaxAccelCartesianVelCurve(VELOCITY_RANGE_DEFAULT, MAX_ACC_ORTH, MAX_ACC_PARALLEL, APPROACH_SPEED_MINIMUM_DEFAULT)
 
     # Calculation for Vector Field

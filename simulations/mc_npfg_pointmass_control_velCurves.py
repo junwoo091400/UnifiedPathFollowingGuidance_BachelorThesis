@@ -1,5 +1,7 @@
 """
 Simulation script for simulating NPFG contro of a point-mass multicopter
+
+Control is done using different Velocity Curves.
 """
 import unittest
 from typing import Optional
@@ -11,20 +13,35 @@ import pygame
 import gym
 from windywings.libs.npfg import NPFG
 
+from theories.velocity_reference_algorithms import *
+
 # Rendering
 SCREEN_SIZE_DEFAULT = (1000, 1000) # Default screen size for rendering
 MULTICOPTER_CIRCLE_RADIUS = 10 # Radius of the circle representing vehicle in rendering
 
 # Environment constraints
+MIN_VELOCITY = 0.0
 NOM_VELOCITY = 0.0
 MAX_VELOCITY = 15.0
+
 MAX_ACCELERATION = 10.0
 WORLD_SIZE_DEFAULT = 100.0 # [m] Default simulated world size
 PATH_BEARING_DEG_DEFAULT = 0.0
 PATH_CURVATURE_DEFAULT = 0.0
 
+TRACK_KEEPING_SPEED_DEFAULT = 5.0 # Same default used in NPFG
+V_APPROACH_MIN_DEFAULT = 5.0
+
+# Helper variables
+VEL_RANGE = np.array([MIN_VELOCITY, NOM_VELOCITY, MAX_VELOCITY])
+
 SIM_DURATION_SEC = 20.0 # [s] How long the simulation will run (`step()` time)
 SIM_TIME_DT = 0.03 # [s] Dt from each `step` (NOTE: Ideally, this should match 1/FPS of the environment, but since we don't render in the environment, this isn't necessary)
+
+## User Setting
+V_PATH = 5.0
+
+SELECTOR = 1 # Dirty selector for the vel Curve algorithm
 
 class MC_npfg_pointmass(unittest.TestCase):
     ''' NPFG Testing class on a Point-mass modeled multicopter environment '''
@@ -40,9 +57,13 @@ class MC_npfg_pointmass(unittest.TestCase):
         initial_state = np.concatenate((pos, vel, acc), axis=None)
         self.env.reset(initial_state=initial_state)
 
-        # NPFG
+        ## Velocity Curves
         self.npfg = NPFG(nominal_airspeed, MAX_VELOCITY) # NOTE: Max velocity is fixed to this constant, so if nominal velocity is set higher by user, it will be capped!! (Currently 0.0, so doesn't matter)
         self.npfg.min_ground_speed = 0.0 # For pure track-keeping feature, user-set min ground speed msut be 0.0!
+
+        self.npfg_bf_stripped = TjNpfgBearingFeasibilityStripped(VEL_RANGE, 0.0, TRACK_KEEPING_SPEED_DEFAULT)
+        self.npfg_cartesian_v_approach_min = TjNpfgCartesianlVapproachMin(VEL_RANGE, V_APPROACH_MIN_DEFAULT)
+        self.max_accel_cartesian_velcurve = MaxAccelCartesianVelCurve(VEL_RANGE, MAX_ACCELERATION/np.sqrt(2), MAX_ACCELERATION/np.sqrt(2), V_APPROACH_MIN_DEFAULT)
 
         # Path setting
         self.path_bearing = np.deg2rad(path_bearing_deg)
@@ -73,13 +94,33 @@ class MC_npfg_pointmass(unittest.TestCase):
         for i,_ in enumerate(range(int(SIM_DURATION_SEC/SIM_TIME_DT))):
             # Decode observation to get current vehicle state
             pos, vel, acc = self.env.decode_state(self.observation)
+            # Calculate input for Vel Curves
+            unit_path_tangent = self.path_unit_tangent_vec
+            position_error_vec = pos - self.path_position
+            signed_track_error = np.cross(unit_path_tangent, position_error_vec) # If positive, vehicle is on left side of path
 
-            # Calculate NPFG logic
-            self.npfg.navigatePathTangent_nowind(pos, self.path_position, self.path_unit_tangent_vec, vel, self.path_curvature)
-            self.air_vel_ref = self.npfg.getAirVelRef()
-            self.acc_ff_curvature = self.npfg.getAccelFFCurvature()
+            # Calculate variables for Vel Curve Formulation
+            if SELECTOR == 0:
+                # Calculate NPFG logic
+                self.npfg.navigatePathTangent_nowind(pos, self.path_position, self.path_unit_tangent_vec, vel, self.path_curvature)
+                self.air_vel_ref = self.npfg.getAirVelRef()
+                # self.acc_ff_curvature = self.npfg.getAccelFFCurvature() # Should be 0, on straight path
+            elif SELECTOR == 1:
+                # Calculate TJ NPFG logic without Bearing Feasibility
+                self.npfg_bf_stripped.set_ground_speed(np.linalg.norm(vel))
+                self.air_vel_ref = self.npfg_bf_stripped.calculate_velRef(np.abs(signed_track_error), V_PATH)
+            elif SELECTOR == 2:
+                # Calculate TJ NPFG with decoupled cartesian V_approach_min
+                self.npfg_cartesian_v_approach_min.set_ground_speed(np.linalg.norm(vel))
+                self.air_vel_ref = self.npfg_cartesian_v_approach_min.calculate_velRef(np.abs(signed_track_error), V_PATH)
+            elif SELECTOR == 3:
+                # Calculate Max Accel Cartesian Vel Curve
+                self.air_vel_ref = self.max_accel_cartesian_velcurve.calculate_velRef_array(np.array([np.abs(signed_track_error)]), V_PATH)
+
+            print(self.air_vel_ref)
 
             # Calculate the action
+            self.acc_ff_curvature = 0.0
             self.action = np.concatenate((self.air_vel_ref, self.acc_ff_curvature), axis=None)
 
             # Take a step in simulation
