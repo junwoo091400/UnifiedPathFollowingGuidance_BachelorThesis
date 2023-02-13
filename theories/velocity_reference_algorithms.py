@@ -29,6 +29,17 @@ PATH_POSITION = np.array([0, 0])
 PATH_UNIT_TANGENT_VEC = np.array([1.0, 0.0])
 PATH_CURVATURE = 0.0
 
+# Helper Function
+def velocity_array_to_parallel_position_array(velocity_arrays, track_error_range):
+    '''
+    Dirty discrete integration function to convert velocity curves into the parallel position array (along track error).
+    The dt is calculated based on remaining distance / orthogonal velocity & multiply with parallel velocity to get position advancement.
+    Done to bypass using SciPy, which can be a bit more complicated / may not be necessary for viewing general movement.
+
+    Input: Velocity reference vector [parallel, orthogonal (to path)] in [m/s] (always positive)
+    Output: [[Final parallel position, min(track_error_range)], ... [0, max(track_error_range)]]
+    '''
+
 class VelocityReferenceCurves:
     '''
     Base class for velocity reference curve formulations
@@ -77,6 +88,18 @@ class VelocityReferenceCurves:
         [[Parallel Vel Curve], [Orthogonal Vel Curve]] form
         '''
         return np.stack([self.calculate_velRef(e, v_path) for e in track_error_range], axis=1)
+
+    def calculate_parallel_position_array(self, track_error_range, v_path):
+        '''
+        Calculates the path-parallel trajectory formed by the Vref curve.
+
+        Logically, the integration would result in:
+        [[0, max(track_error_range)], ... [Final parallel position, min(track_error_range)]]
+
+        However, we preserve the track error array order for return:
+        [[Final parallel position, min(track_error_range)], ... [0, max(track_error_range)]]
+        '''
+        assert False, "calculate_parallel_position_array should not be called directly!"
 
     def get_track_error_boundary(self):
         '''
