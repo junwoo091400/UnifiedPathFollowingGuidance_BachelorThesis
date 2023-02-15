@@ -37,9 +37,46 @@ def velocity_array_to_parallel_position_array(velocity_arrays, track_error_range
     Done to bypass using SciPy, which can be a bit more complicated / may not be necessary for viewing general movement.
 
     Input: Velocity reference vector [parallel, orthogonal (to path)] in [m/s] (always positive)
-    Output: [[Final parallel position, min(track_error_range)], ... [0, max(track_error_range)]]
+    Output: [Final parallel position, ... 0(= initial starting position entering boundary)]
     '''
+    return
+
+def vel_array_to_acc(vel_parallel_array, vel_orthogonal_array, track_error_range):
+    '''
+    Output: [[Parallel Accelerations ... ], [Orthogonal Accelerations ... ]]
+    '''
+    assert np.ndim(vel_parallel_array) == 1 and np.ndim(vel_orthogonal_array) == 1
+    assert np.shape(vel_parallel_array) == np.shape(track_error_range) and np.shape(vel_orthogonal_array) == np.shape(track_error_range)
     
+    # Calculate rough acceleration based on discrete track error boundary based parallel / orthogonal vel curves
+    # We back-trace it starting from the on-path (minimum track error, index 0 of the error range array), and
+    track_error_len = len(track_error_range)
+
+    acc_P = np.empty(track_error_len)
+    acc_O = np.empty(track_error_len)
+    # dt = np.empty(track_error_len) # Dt for each segment [i, i+1]
+
+    for i in range(track_error_len-1):
+        # dt = dE/V_orth(e). NOTE that track error range's derivative is NEGATIVE of orthogonal vel
+        # We increase 'accuracy' of velocity thing by incorporating average of two velocity values
+        avg_vel_orth = (vel_orthogonal_array[i]+vel_orthogonal_array[i+1])/2
+
+        if avg_vel_orth == 0.0:
+            # Divide by zero case (basically infeasible Vector Field, as with 0 orth vel, it can't reach target)
+            acc_O[i] = np.nan
+            acc_P[i] = np.nan
+        else:
+            dt = (track_error_range[i+1]-track_error_range[i])/avg_vel_orth
+            # Acc orth = d(V_orth)/dt
+            acc_O[i] = (vel_orthogonal_array[i]-vel_orthogonal_array[i+1])/dt
+            # Acc parallel = d(V_p)/dt
+            acc_P[i] = (vel_parallel_array[i]-vel_parallel_array[i+1])/dt
+
+    # provide NaN for the final track error range element, as we can't calculate the derivative there.
+    acc_P[-1] = np.nan
+    acc_O[-1] = np.nan
+
+    return (acc_P, acc_O)
 
 class VelocityReferenceCurves:
     '''
