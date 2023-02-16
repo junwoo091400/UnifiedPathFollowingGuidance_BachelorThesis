@@ -153,6 +153,33 @@ def vel_array_to_course_rate(vel_parallel_array, vel_orthogonal_array, track_err
 
     return rates
 
+def vel_array_to_converge_time(vel_orthogonal_array, track_error_range):
+    '''
+    Calculate time to converge to track.
+
+    To calculate converge time from track error bound, the track_error_range needs to end at the desired bound, cut by the user.
+    '''
+    assert np.shape(vel_orthogonal_array)[0] >= np.shape(track_error_range)[0], "Velocity curve must have larger range than track error boundary!"
+    
+    # Calculate rough acceleration based on discrete track error boundary based parallel / orthogonal vel curves
+    # We back-trace it starting from the on-path (minimum track error, index 0 of the error range array), and
+    track_error_len = len(track_error_range)
+    total_time = 0.0
+
+    for i in range(track_error_len-1):
+        # dt = dE/V_orth(e). NOTE that track error range's derivative is NEGATIVE of orthogonal vel
+        # We increase 'accuracy' of velocity thing by incorporating average of two velocity values
+        avg_vel_orth = (vel_orthogonal_array[i]+vel_orthogonal_array[i+1])/2
+
+        if avg_vel_orth == 0.0:
+            # VF is stuck here, technically it's infinite dt, so set pos to NAN
+            # Technically, we need to set dt to NAN, but we skip that for now
+            continue
+        else:
+            dt = (track_error_range[i+1]-track_error_range[i])/avg_vel_orth
+            total_time += dt
+
+    return total_time
 
 class VelocityReferenceCurves:
     '''
