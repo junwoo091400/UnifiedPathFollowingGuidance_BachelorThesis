@@ -251,9 +251,9 @@ class VelocityReferenceCurves:
         assert False, "get_track_error_boundary of base class shouldn't be used directly!"
 
 class TjNpfg(VelocityReferenceCurves):
-    def __init__(self, vel_range, ground_speed, track_keeping_speed, max_acc=MAX_ACC_DEFAULT, max_jerk=MAX_JERK_DEFAULT):
+    def __init__(self, vel_range, ground_speed, track_keeping_speed):
         # Initialize class
-        super().__init__(vel_range, max_acc, max_jerk)
+        super().__init__(vel_range)
         self.ground_speed = ground_speed # Additional argument for TJ NPFG, stays constant
         assert self.ground_speed >= self.vel_range[0] and self.ground_speed <= self.vel_range[2]
 
@@ -322,15 +322,19 @@ class TjNpfgBearingFeasibilityStripped(TjNpfg):
 
         # LOGIC
         # TEB calculation with time-constant is left as legacy
-        track_error_bound = self.npfg.trackErrorBound(self.ground_speed, self.npfg.time_const)
-        normalized_track_error = np.clip(track_error/track_error_bound, 0.0, 1.0)
-
+        self.track_error_bound = self.npfg.trackErrorBound(self.ground_speed, self.npfg.time_const)
+        normalized_track_error = np.clip(track_error/self.track_error_bound, 0.0, 1.0)
         look_ahead_ang = self.npfg.lookAheadAngle(normalized_track_error) # LAA solely based on track proximity (normalized)
         bearing_vector = self.npfg.bearingVec(PATH_UNIT_TANGENT_VEC, look_ahead_ang, NEGATIVE_TRACK_ERROR_AUGMENT)
         minimum_groundspeed_reference = self.npfg.minGroundSpeed(normalized_track_error, ZERO_FEASIBILITY_COMBINED_AUGMENT)
         
         # X, Y component. Should represent Parallel and Orthogonal components of reference velocity curve
         return self.npfg.refAirVelocity(bearing_vector, minimum_groundspeed_reference)
+
+    def get_track_error_boundary(self):
+        # NOTE: Since BF Stripped doesn't call all necessary functions, the debug value for track error bound actually
+        # doesn't get set. So we need to cache the bound independently!!
+        return self.track_error_bound
 
 class RuckigTimeOptimalTrajectory(VelocityReferenceCurves):
     '''
