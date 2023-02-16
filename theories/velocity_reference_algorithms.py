@@ -30,16 +30,48 @@ PATH_UNIT_TANGENT_VEC = np.array([1.0, 0.0])
 PATH_CURVATURE = 0.0
 
 # Helper Function
-def velocity_array_to_parallel_position_array(velocity_arrays, track_error_range):
+def velocity_array_to_parallel_position_array(vel_parallel_array, vel_orthogonal_array, track_error_range):
     '''
     Dirty discrete integration function to convert velocity curves into the parallel position array (along track error).
     The dt is calculated based on remaining distance / orthogonal velocity & multiply with parallel velocity to get position advancement.
     Done to bypass using SciPy, which can be a bit more complicated / may not be necessary for viewing general movement.
 
     Input: Velocity reference vector [parallel, orthogonal (to path)] in [m/s] (always positive)
-    Output: [Final parallel position, ... 0(= initial starting position entering boundary)]
+    Output: [0(= initial starting position entering boundary) ... Final parallel position (negative)]
     '''
-    return
+    assert np.ndim(vel_parallel_array) == 1 and np.ndim(vel_orthogonal_array) == 1
+    assert np.shape(vel_parallel_array) == np.shape(track_error_range) and np.shape(vel_orthogonal_array) == np.shape(track_error_range)
+    
+    # Calculate rough acceleration based on discrete track error boundary based parallel / orthogonal vel curves
+    # We back-trace it starting from the on-path (minimum track error, index 0 of the error range array), and
+    track_error_len = len(track_error_range)
+    p_pos = np.empty(track_error_len)
+
+    # Initial starting place is 0
+    p_pos[0] = 0.0
+
+    for i in range(track_error_len-1):
+        # dt = dE/V_orth(e). NOTE that track error range's derivative is NEGATIVE of orthogonal vel
+        # We increase 'accuracy' of velocity thing by incorporating average of two velocity values
+        avg_vel_orth = (vel_orthogonal_array[i]+vel_orthogonal_array[i+1])/2
+
+        if avg_vel_orth == 0.0:
+            # VF is stuck here, technically it's infinite dt, so set pos to NAN
+            p_pos[i] = np.nan
+        else:
+            dt = (track_error_range[i+1]-track_error_range[i])/avg_vel_orth
+            
+            # Integrate backwards in time, so apply -V_parallel
+            dPos = -vel_parallel_array[i] * dt
+
+            if np.isfinite(p_pos[i]):
+                # Itegrate normally
+                p_pos[i+1] = p_pos[i] + dPos
+            else:
+                # Hard reset
+                p_pos[i+1] = dPos
+
+    return p_pos
 
 def vel_array_to_acc(vel_parallel_array, vel_orthogonal_array, track_error_range):
     '''
