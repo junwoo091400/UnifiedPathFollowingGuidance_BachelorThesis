@@ -86,6 +86,42 @@ def vel_array_to_vel_norm(vel_parallel_array, vel_orthogonal_array):
 
     return np.sqrt(np.square(vel_parallel_array)+np.square(vel_orthogonal_array))
 
+def vel_array_to_course_rate(vel_parallel_array, vel_orthogonal_array, track_error_range):
+    '''
+    Calculates rate of 'course' of the VF across the track error range
+
+    Course = 0 in the direction of V_path, - in the direction of V_approach (Clockwise)
+    == atan2(-V_orth, V_parallel)
+
+    Output: [Course rate [rad/s] ... ]
+    '''
+    assert np.ndim(vel_parallel_array) == 1 and np.ndim(vel_orthogonal_array) == 1
+    assert np.shape(vel_parallel_array) == np.shape(track_error_range) and np.shape(vel_orthogonal_array) == np.shape(track_error_range)
+    
+    # Calculate rough acceleration based on discrete track error boundary based parallel / orthogonal vel curves
+    # We back-trace it starting from the on-path (minimum track error, index 0 of the error range array), and
+    track_error_len = len(track_error_range)
+    rates = np.empty(track_error_len)
+
+    for i in range(track_error_len-1):
+        # dt = dE/V_orth(e). NOTE that track error range's derivative is NEGATIVE of orthogonal vel
+        # We increase 'accuracy' of velocity thing by incorporating average of two velocity values
+        avg_vel_orth = (vel_orthogonal_array[i]+vel_orthogonal_array[i+1])/2
+
+        if avg_vel_orth == 0.0:
+            # VF stops here (doesn't get closer to path), course doesn't change.
+            rates[i] = 0.0
+        else:
+            dt = (track_error_range[i+1]-track_error_range[i])/avg_vel_orth
+            course_i = np.arctan2(-vel_orthogonal_array[i], vel_parallel_array[i])
+            course_ip1 = np.arctan2(-vel_orthogonal_array[i+1], vel_parallel_array[i+1])
+            rates[i] = (course_i - course_ip1) / dt
+
+    rates[-1] = np.nan
+
+    return rates
+
+
 class VelocityReferenceCurves:
     '''
     Base class for velocity reference curve formulations
