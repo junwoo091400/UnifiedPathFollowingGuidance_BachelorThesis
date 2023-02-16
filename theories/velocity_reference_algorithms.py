@@ -78,6 +78,14 @@ def vel_array_to_acc(vel_parallel_array, vel_orthogonal_array, track_error_range
 
     return (acc_P, acc_O)
 
+def vel_array_to_vel_norm(vel_parallel_array, vel_orthogonal_array):
+    '''
+    Output: [Vel norm ...]
+    '''
+    assert np.shape(vel_parallel_array) == np.shape(vel_orthogonal_array)
+
+    return np.sqrt(np.square(vel_parallel_array)+np.square(vel_orthogonal_array))
+
 class VelocityReferenceCurves:
     '''
     Base class for velocity reference curve formulations
