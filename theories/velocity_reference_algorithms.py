@@ -352,14 +352,14 @@ class TjNpfgBearingFeasibilityStrippedVpathSquashed(TjNpfg):
     '''
     def __init__(self, vel_range, ground_speed, track_keeping_speed):
         # Enforced arbitrary ratio to keep to satisfy the assumption (and squashing) to work
-        V_NOM_TO_V_MAX_MIN_RATIO = 0.5
+        V_NOM_MIN = 1.0
         # Hard lower limit the nominal airspeed
-        if vel_range[1] < vel_range[2] * V_NOM_TO_V_MAX_MIN_RATIO:
-            print('[TJ NPFG Squashed] V_nom too low! Vel Range encountered:', vel_range)
-            vel_range = np.copy(vel_range) # Copy new data, so we don't modify original vel range
-            vel_range[1] = vel_range[2] * V_NOM_TO_V_MAX_MIN_RATIO
+        # if vel_range[1] < vel_range[2] * V_NOM_TO_V_MAX_MIN_RATIO:
+        #     print('[TJ NPFG Squashed] V_nom too low! Vel Range encountered:', vel_range)
+        #     vel_range = np.copy(vel_range) # Copy new data, so we don't modify original vel range
+        #     vel_range[1] = vel_range[2] * V_NOM_TO_V_MAX_MIN_RATIO
 
-        assert vel_range[1] >= vel_range[2] * V_NOM_TO_V_MAX_MIN_RATIO, "V_nom must be bigger than sane value for squashing assumption to work!!"
+        assert vel_range[1] >= V_NOM_MIN, "V_nom must be bigger than sane value for squashing assumption to work!!"
         
         super().__init__(vel_range, ground_speed, track_keeping_speed)
 
@@ -370,6 +370,11 @@ class TjNpfgBearingFeasibilityStrippedVpathSquashed(TjNpfg):
         Basically replaces the `guideToPath_nowind` function.
         '''
         self.assert_input_variables(track_error, v_path)
+
+        # Ideally this should only come into effect if path velocity is lower than nom velocity.
+        # To not have interference between V_nom and V_path range, the 'track keeping' must be turned off / excluded.
+        # Because, otherwise we can't guarantee that the Vel ref will have magnitude of V_nom!!
+
         v_p_squash_ratio = v_path / self.vel_range[1] # V_path/V_nom
 
         # Constants
