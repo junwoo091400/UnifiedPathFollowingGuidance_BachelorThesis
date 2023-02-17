@@ -17,6 +17,7 @@ Note:
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.widgets import Slider
 
 # Import the velocity curve functions
 from velocity_reference_algorithms import *
@@ -26,20 +27,32 @@ TRACK_ERROR_MAX = 70 # [m] Maximum track error we simulate (in Y-direction, as p
 GRID_SIZE = 1.0 # [m] Interval that data will be calculated along track error axis
 
 # User adjustable
-VELOCITY_NOM = 5.0
-PATH_DESIRED_SPEED = 8.0 # [m/s] Desired speed on path
-APPROACH_SPEED_MINIMUM_DEFAULT = 3.0
-GROUND_SPEED_DEFAULT = 5.0 # Only should be used by TJ NPFG
-TJ_NPFG_TRACK_KEEPING_SPD = 5.0 # Max minimum track keeping ground speed variable (only for TJ NPFG derived algorithms)
-MAX_ACC_ORTH = 3.0
-MAX_ACC_PARALLEL = 3.0
+# IS_MC = True
+IS_MC = False # Fixed-Wing
+
+if IS_MC:
+    # Multicopter constraints
+    VELOCITY_MIN = 0.0
+    VELOCITY_NOM = 6.0
+    VELOCITY_MAX = 15.0
+else:
+    # Fixed wing constraints
+    VELOCITY_MIN = 6.0
+    VELOCITY_NOM = 10.0
+    VELOCITY_MAX = 15.0
+
+PATH_DESIRED_SPEED = 7.0 # [m/s] Desired speed on path
+APPROACH_SPEED_MINIMUM_DEFAULT = 7.5
+
+TJ_NPFG_TRACK_KEEPING_SPD = 9.0 # Max minimum track keeping ground speed variable (only for TJ NPFG derived algorithms)
+
+MAX_ACC_ORTH = 7.0
+MAX_ACC_PARALLEL = 7.0
+
+GROUND_SPEED_DEFAULT = 6.0 # Only should be used by TJ NPFG
 
 # Calculated
-VELOCITY_RANGE_DEFAULT = np.array([0.0, VELOCITY_NOM, 12.0]) # Arbitrary min, nom and max speed
-
-# Not used for now
-MAX_ACC_DEFAULT = 10.0 # Default max acc value [m/s^2]
-MAX_JERK_DEFAULT = 5.0 # Default max jerk [m/s^3]
+VELOCITY_RANGE_DEFAULT = np.array([VELOCITY_MIN, VELOCITY_NOM, VELOCITY_MAX])
 
 # Visualization
 TRACK_ERROR_BOUNDARY_STYLE = 'dashed'
@@ -53,11 +66,17 @@ TJ_NPFG_LEGEND = 'TJ NPFG'
 TJ_NPFG_BF_STRIPPED_COLOR = 'g'
 TJ_NPFG_BF_STRIPPED_LABEL = 'TJ NPFG BF Stripped'
 
+TJ_NPFG_BF_STRIPPED_V_PATH_SQUASHED_COLOR = 'pink'
+TJ_NPFG_BF_STRIPPED_V_PATH_SQUASHED_LABEL = 'TJ NPFG BF Strip & Vpath Squashed'
+
 TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_COLOR = 'r'
 TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_LABEL = 'TJ NPFG Cartesian V_approach min'
 
 RELAXED_MAX_ACCEL_CARTESIAN_COLOR = 'brown'
 RELAXED_MAX_ACCEL_CARTESIAN_LABEL = 'Relaxed Max Acc Cartesian'
+
+# Vehicle constraints
+# MC_ACC_PATH_ORTH
 
 def draw_Vel_Curves(ax_V_parallel: plt.Axes, ax_V_orthogonal: plt.Axes, velCurveObject: VelocityReferenceCurves, track_error_range, v_path, label, color):
     '''
@@ -100,33 +119,21 @@ def draw_aux_curves(ax_acc_p, ax_acc_o, ax_norm, ax_course_rates, ax_p_pos, velC
     tot_time = vel_array_to_converge_time(S_o, clipped_track_error_range)
     print('Converge time for {}: {}s, track_error_len:{}'.format(label, tot_time, len(clipped_track_error_range)))
 
-def main():
-    # Visualization data setup
-    track_error_range = np.arange(0.0, TRACK_ERROR_MAX + GRID_SIZE/2, GRID_SIZE)
+def drawCurves(ax_V_parallel, ax_V_orthogonal, ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, v_path, vel_range):
+    '''
+    Draw (refresh) all the curves with given Axes objects & conditions
+    '''
+    assert np.shape(vel_range) == VELOCITY_RANGE_SHAPE
 
-    # Instances for each algorithms
-    tj_npfg = TjNpfg(VELOCITY_RANGE_DEFAULT, GROUND_SPEED_DEFAULT, TJ_NPFG_TRACK_KEEPING_SPD)
-    tj_npfg_bf_stripped = TjNpfgBearingFeasibilityStripped(VELOCITY_RANGE_DEFAULT, GROUND_SPEED_DEFAULT, TJ_NPFG_TRACK_KEEPING_SPD)
-    tj_npfg_cartesian_v_approach_min = TjNpfgCartesianlVapproachMin(VELOCITY_RANGE_DEFAULT, APPROACH_SPEED_MINIMUM_DEFAULT)
-    max_accel_relaxed_cartesian = MaxAccelCartesianVelCurve(VELOCITY_RANGE_DEFAULT, MAX_ACC_ORTH, MAX_ACC_PARALLEL, APPROACH_SPEED_MINIMUM_DEFAULT)
+    # Clear the plots
+    ax_V_parallel.cla()
+    ax_V_orthogonal.cla()
+    ax_Acc_orthogonal.cla()
+    ax_Acc_parallel.cla()
+    ax_norm.cla()
+    ax_course_rates.cla()
+    ax_track.cla()
 
-    # Draw the result
-    fig = plt.figure(figsize=(12, 10))
-    fig.suptitle("Vnom {}m/s, Vmax {}m/s, Vpath {} m/s, Vg = {}m/s, Vapproach_min = {}m/s".format(VELOCITY_RANGE_DEFAULT[1], VELOCITY_RANGE_DEFAULT[2], PATH_DESIRED_SPEED, GROUND_SPEED_DEFAULT, APPROACH_SPEED_MINIMUM_DEFAULT))
-
-    # Create Axes
-    # https://matplotlib.org/3.1.0/api/_as_gen/matplotlib.figure.Figure.html#matplotlib.figure.Figure.add_subplot
-    ax_V_parallel = fig.add_subplot(4, 2, 1)
-    ax_V_orthogonal = fig.add_subplot(4, 2, 2, sharex=ax_V_parallel)
-
-    ax_Acc_parallel = fig.add_subplot(4, 2, 3, sharex=ax_V_parallel)
-    ax_Acc_orthogonal = fig.add_subplot(4, 2, 4, sharex=ax_V_parallel)
-
-    ax_norm = fig.add_subplot(4, 2, 5, sharex=ax_V_parallel)
-    ax_coure_rates = fig.add_subplot(4, 2, 7, sharex=ax_V_parallel)
-
-    ax_track = fig.add_subplot(2, 2, 4, sharex=ax_V_parallel)
-    
     # Title and Label settings
     ax_V_parallel.set_title('Velocity parallel to path')
     ax_V_parallel.set_ylabel('V parallel [m/s]')
@@ -145,37 +152,49 @@ def main():
     ax_Acc_orthogonal.grid()
 
     ax_norm.set_title('Velocity norm [m/s]')
+    ax_norm.grid()
 
-    ax_coure_rates.set_title('Course rate [rad/s]')
+    ax_course_rates.set_title('Course rate [rad/s]')
+    ax_course_rates.grid()
 
-    ax_track.set_title('Track of Vector Field')
+    ax_track.set_title('Path drawn by Vel Curves')
     ax_track.grid()
 
+    # Visualization data setup
+    track_error_range = np.arange(0.0, TRACK_ERROR_MAX + GRID_SIZE/2, GRID_SIZE)
+
+    # Instances for each algorithms
+    tj_npfg = TjNpfg(vel_range, GROUND_SPEED_DEFAULT, TJ_NPFG_TRACK_KEEPING_SPD)
+    tj_npfg_bf_stripped = TjNpfgBearingFeasibilityStripped(vel_range, GROUND_SPEED_DEFAULT, TJ_NPFG_TRACK_KEEPING_SPD)
+    tj_npfg_squashed = TjNpfgBearingFeasibilityStrippedVpathSquashed(vel_range, GROUND_SPEED_DEFAULT, TJ_NPFG_TRACK_KEEPING_SPD)
+    tj_npfg_cartesian_v_approach_min = TjNpfgCartesianlVapproachMin(vel_range, APPROACH_SPEED_MINIMUM_DEFAULT)
+    max_accel_relaxed_cartesian = MaxAccelCartesianVelCurve(vel_range, MAX_ACC_ORTH, MAX_ACC_PARALLEL, APPROACH_SPEED_MINIMUM_DEFAULT)
+
     # Draw Velocity Curves
-    # TJ NPFG Velocity curves
-    draw_Vel_Curves(ax_V_parallel, ax_V_orthogonal, tj_npfg, track_error_range, PATH_DESIRED_SPEED, TJ_NPFG_LEGEND, TJ_NPFG_COLOR)
-    # TJ NPFG BF Stripped Velocity curves
-    draw_Vel_Curves(ax_V_parallel, ax_V_orthogonal, tj_npfg_bf_stripped, track_error_range, PATH_DESIRED_SPEED, TJ_NPFG_BF_STRIPPED_LABEL, TJ_NPFG_BF_STRIPPED_COLOR)
-    # TJ NPFG BF Cartesian V_approach_min Velocity curves
-    draw_Vel_Curves(ax_V_parallel, ax_V_orthogonal, tj_npfg_cartesian_v_approach_min, track_error_range, PATH_DESIRED_SPEED, TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_LABEL, TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_COLOR)
-    # Max Acc Relaxed Cartesian
-    draw_Vel_Curves(ax_V_parallel, ax_V_orthogonal, max_accel_relaxed_cartesian, track_error_range, PATH_DESIRED_SPEED, RELAXED_MAX_ACCEL_CARTESIAN_LABEL, RELAXED_MAX_ACCEL_CARTESIAN_COLOR)
+    draw_Vel_Curves(ax_V_parallel, ax_V_orthogonal, tj_npfg, track_error_range, v_path, TJ_NPFG_LEGEND, TJ_NPFG_COLOR)
+    draw_Vel_Curves(ax_V_parallel, ax_V_orthogonal, tj_npfg_bf_stripped, track_error_range, v_path, TJ_NPFG_BF_STRIPPED_LABEL, TJ_NPFG_BF_STRIPPED_COLOR)
+    draw_Vel_Curves(ax_V_parallel, ax_V_orthogonal, tj_npfg_squashed, track_error_range, v_path, TJ_NPFG_BF_STRIPPED_V_PATH_SQUASHED_LABEL, TJ_NPFG_BF_STRIPPED_V_PATH_SQUASHED_COLOR)
+    
+    draw_Vel_Curves(ax_V_parallel, ax_V_orthogonal, tj_npfg_cartesian_v_approach_min, track_error_range, v_path, TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_LABEL, TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_COLOR)
+    
+    draw_Vel_Curves(ax_V_parallel, ax_V_orthogonal, max_accel_relaxed_cartesian, track_error_range, v_path, RELAXED_MAX_ACCEL_CARTESIAN_LABEL, RELAXED_MAX_ACCEL_CARTESIAN_COLOR)
 
     # Draw auxilary Curves
-    draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_coure_rates, ax_track, tj_npfg, track_error_range, PATH_DESIRED_SPEED, TJ_NPFG_LEGEND, TJ_NPFG_COLOR)
-    draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_coure_rates, ax_track, tj_npfg_bf_stripped, track_error_range, PATH_DESIRED_SPEED, TJ_NPFG_BF_STRIPPED_LABEL, TJ_NPFG_BF_STRIPPED_COLOR)
-    draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_coure_rates, ax_track, tj_npfg_cartesian_v_approach_min, track_error_range, PATH_DESIRED_SPEED, TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_LABEL, TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_COLOR)
-    draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_coure_rates, ax_track, max_accel_relaxed_cartesian, track_error_range, PATH_DESIRED_SPEED, RELAXED_MAX_ACCEL_CARTESIAN_LABEL, RELAXED_MAX_ACCEL_CARTESIAN_COLOR)
+    draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, tj_npfg, track_error_range, v_path, TJ_NPFG_LEGEND, TJ_NPFG_COLOR)
+    draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, tj_npfg_bf_stripped, track_error_range, v_path, TJ_NPFG_BF_STRIPPED_LABEL, TJ_NPFG_BF_STRIPPED_COLOR)
+    draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, tj_npfg_squashed, track_error_range, v_path, TJ_NPFG_BF_STRIPPED_V_PATH_SQUASHED_LABEL, TJ_NPFG_BF_STRIPPED_V_PATH_SQUASHED_COLOR)
+    draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, tj_npfg_cartesian_v_approach_min, track_error_range, v_path, TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_LABEL, TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_COLOR)
+    draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, max_accel_relaxed_cartesian, track_error_range, v_path, RELAXED_MAX_ACCEL_CARTESIAN_LABEL, RELAXED_MAX_ACCEL_CARTESIAN_COLOR)
 
     # Velocity constraints plot
     VEL_CONSTRAINTS_PLOT_STYLE = 'dashed'
     # https://matplotlib.org/stable/gallery/lines_bars_and_markers/fill_between_demo.html#selectively-marking-horizontal-regions-across-the-whole-axes
     V_NOM_COLOR = 'cornsilk'
     V_MAX_COLOR = 'mistyrose'
-    ax_V_orthogonal.fill_between(track_error_range, VELOCITY_RANGE_DEFAULT[0], VELOCITY_RANGE_DEFAULT[1], color=V_NOM_COLOR)
-    ax_V_parallel.fill_between(track_error_range, VELOCITY_RANGE_DEFAULT[0], VELOCITY_RANGE_DEFAULT[1], color=V_NOM_COLOR)
-    ax_V_orthogonal.fill_between(track_error_range, VELOCITY_RANGE_DEFAULT[1], VELOCITY_RANGE_DEFAULT[2], color=V_MAX_COLOR)
-    ax_V_parallel.fill_between(track_error_range, VELOCITY_RANGE_DEFAULT[1], VELOCITY_RANGE_DEFAULT[2], color=V_MAX_COLOR)
+    ax_V_orthogonal.fill_between(track_error_range, vel_range[0], vel_range[1], color=V_NOM_COLOR)
+    ax_V_parallel.fill_between(track_error_range, vel_range[0], vel_range[1], color=V_NOM_COLOR)
+    ax_V_orthogonal.fill_between(track_error_range, vel_range[1], vel_range[2], color=V_MAX_COLOR)
+    ax_V_parallel.fill_between(track_error_range, vel_range[1], vel_range[2], color=V_MAX_COLOR)
 
     # Velocity cutoff range draw
     APPROACH_SPEED_MINIMUM_LABEL = 'V_approach_minimum'
@@ -188,14 +207,72 @@ def main():
     TJ_NPFG_TRACK_KEEPING_SPD_COLOR = 'orange'
     ax_V_orthogonal.axhline(TJ_NPFG_TRACK_KEEPING_SPD, xmin=np.min(track_error_range), xmax=np.max(track_error_range), color=TJ_NPFG_TRACK_KEEPING_SPD_COLOR, linestyle=VEL_CONSTRAINTS_PLOT_STYLE, label=TJ_NPFG_TRACK_KEEPING_SPD_LABEL)
 
-    # Legend
-    ax_V_parallel.legend()
-    ax_V_orthogonal.legend()
+    # Legend: https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.legend.html
+    ax_V_parallel.legend(loc='upper right')
+    ax_V_orthogonal.legend(loc='upper right')
     ax_norm.legend()
-    ax_coure_rates.legend()
+    ax_course_rates.legend()
     ax_track.legend()
-    
+
+def main():
+    # Runtime variables (used in slider callback)
+    vel_range = VELOCITY_RANGE_DEFAULT
+    v_path = PATH_DESIRED_SPEED
+
+    # Draw
+    fig = plt.figure(figsize=(12, 10))
+    fig.suptitle("Vnom {}m/s, Vmax {}m/s, Vpath {} m/s, Vg = {}m/s, Vapproach_min = {}m/s".format(VELOCITY_RANGE_DEFAULT[1], VELOCITY_RANGE_DEFAULT[2], PATH_DESIRED_SPEED, GROUND_SPEED_DEFAULT, APPROACH_SPEED_MINIMUM_DEFAULT))
+
+    # Create Axes
+    # https://matplotlib.org/3.1.0/api/_as_gen/matplotlib.figure.Figure.html#matplotlib.figure.Figure.add_subplot
+    ax_V_parallel = fig.add_subplot(4, 2, 1)
+    ax_V_orthogonal = fig.add_subplot(4, 2, 2, sharex=ax_V_parallel)
+
+    ax_Acc_parallel = fig.add_subplot(4, 2, 3, sharex=ax_V_parallel)
+    ax_Acc_orthogonal = fig.add_subplot(4, 2, 4, sharex=ax_V_parallel)
+
+    ax_norm = fig.add_subplot(4, 2, 5, sharex=ax_V_parallel)
+    ax_course_rates = fig.add_subplot(4, 2, 7, sharex=ax_V_parallel)
+
+    ax_track = fig.add_subplot(2, 2, 4, sharex=ax_V_parallel)
+
+    ## Sliders
+    fig.subplots_adjust(bottom=0.1) # Leave margin in bottom for the slider
+
+    axVpath = plt.axes([0.25, 0.05, 0.5, 0.03])
+    sliderVpath = Slider(axVpath, 'V_path [m/s]', 0, VELOCITY_RANGE_DEFAULT[2], valinit=PATH_DESIRED_SPEED, valfmt='%d', valstep=1.0)
+
+    def updateVpath(val):
+        print('V_path set to:', val)
+        v_path = val
+
+        drawCurves(ax_V_parallel, ax_V_orthogonal, ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, v_path, vel_range)
+
+        fig.suptitle("Vnom {}m/s, Vmax {}m/s, Vpath {} m/s, Vg = {}m/s, Vapproach_min = {}m/s".format(vel_range[1], vel_range[2], v_path, GROUND_SPEED_DEFAULT, APPROACH_SPEED_MINIMUM_DEFAULT))
+        fig.subplots_adjust(bottom=0.1) # Leave margin in bottom for the slider
+        fig.canvas.draw_idle()
+
+    sliderVpath.on_changed(updateVpath)
+
+    axVnom = plt.axes([0.25, 0.025, 0.5, 0.03])
+    sliderVnom = Slider(axVnom, 'V_nom [m/s]', VELOCITY_RANGE_DEFAULT[0], VELOCITY_RANGE_DEFAULT[2], valinit=VELOCITY_RANGE_DEFAULT[1], valfmt='%d', valstep=1.0)
+
+    def updateVnom(val):
+        print('V nom set to:', val)
+        vel_range[1] = val
+
+        drawCurves(ax_V_parallel, ax_V_orthogonal, ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, v_path, vel_range)
+
+        fig.suptitle("Vnom {}m/s, Vmax {}m/s, Vpath {} m/s, Vg = {}m/s, Vapproach_min = {}m/s".format(vel_range[1], vel_range[2], v_path, GROUND_SPEED_DEFAULT, APPROACH_SPEED_MINIMUM_DEFAULT))
+        fig.subplots_adjust(bottom=0.1) # Leave margin in bottom for the slider
+        fig.canvas.draw_idle()
+
+    sliderVnom.on_changed(updateVnom)
+
+    # Initial draw
+    drawCurves(ax_V_parallel, ax_V_orthogonal, ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, PATH_DESIRED_SPEED, VELOCITY_RANGE_DEFAULT)
     fig.tight_layout() # Make sure graphs don't overlap
+
     plt.show()
 
     print('Main function exiting ...')
