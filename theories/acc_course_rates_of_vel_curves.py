@@ -54,14 +54,14 @@ ACC_CURVE_MARKER_TYPE = '*'
 TJ_NPFG_COLOR = 'b'
 TJ_NPFG_LEGEND = 'TJ NPFG'
 
-TJ_NPFG_BF_STRIPPED_COLOR = 'g'
-TJ_NPFG_BF_STRIPPED_LABEL = 'TJ NPFG BF Stripped'
+# TJ_NPFG_BF_STRIPPED_COLOR = 'g'
+# TJ_NPFG_BF_STRIPPED_LABEL = 'TJ NPFG BF Stripped'
 
 TJ_NPFG_BF_STRIPPED_V_PATH_SQUASHED_COLOR = 'pink'
-TJ_NPFG_BF_STRIPPED_V_PATH_SQUASHED_LABEL = 'TJ NPFG BF Strip & Vpath Squashed'
+TJ_NPFG_BF_STRIPPED_V_PATH_SQUASHED_LABEL = 'TJ NPFG squashed'
 
 TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_COLOR = 'r'
-TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_LABEL = 'TJ NPFG Cartesian V_approach min'
+TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_LABEL = 'TJ NPFG Cartesian decoupling'
 
 RELAXED_MAX_ACCEL_CARTESIAN_COLOR = 'brown'
 RELAXED_MAX_ACCEL_CARTESIAN_LABEL = 'Relaxed Max Acc Cartesian'
@@ -117,8 +117,8 @@ def drawCurves(ax_V_parallel, ax_V_orthogonal, ax_Acc_parallel, ax_Acc_orthogona
     assert np.shape(vel_range) == VELOCITY_RANGE_SHAPE
 
     # Algorithm parameters
-    APPROACH_SPEED_MINIMUM_DEFAULT = 0.0 # Disable V_approach_min, as V_nom !=0 now
-    TJ_NPFG_TRACK_KEEPING_SPD = 0.0 # Max minimum track keeping ground speed variable (only for TJ NPFG derived algorithms)
+    APPROACH_SPEED_MINIMUM_DEFAULT = 0.0 # Disable V_approach_min, as V_nom !=0 now. And it creates weird artifacts in total velocity magnitude curves, as V_nom and V_approach_min (biggers) differs.
+    TJ_NPFG_TRACK_KEEPING_SPD = 0.0 # Max minimum track keeping ground speed variable (only for TJ NPFG derived algorithms). This essentially demoishes the purpose of having BF stripped formulation (for max track keeping vel input)
     GROUND_SPEED_DEFAULT = vel_range[1] # Only should be used by TJ NPFG
 
     MAX_ACC_ORTH = 7.0
@@ -164,14 +164,14 @@ def drawCurves(ax_V_parallel, ax_V_orthogonal, ax_Acc_parallel, ax_Acc_orthogona
 
     # Instances for each algorithms
     tj_npfg = TjNpfg(vel_range, GROUND_SPEED_DEFAULT, TJ_NPFG_TRACK_KEEPING_SPD)
-    tj_npfg_bf_stripped = TjNpfgBearingFeasibilityStripped(vel_range, GROUND_SPEED_DEFAULT, TJ_NPFG_TRACK_KEEPING_SPD)
+    # tj_npfg_bf_stripped = TjNpfgBearingFeasibilityStripped(vel_range, GROUND_SPEED_DEFAULT, TJ_NPFG_TRACK_KEEPING_SPD)
     tj_npfg_squashed = TjNpfgBearingFeasibilityStrippedVpathSquashed(vel_range, GROUND_SPEED_DEFAULT, TJ_NPFG_TRACK_KEEPING_SPD)
     tj_npfg_cartesian_v_approach_min = TjNpfgCartesianlVapproachMin(vel_range, APPROACH_SPEED_MINIMUM_DEFAULT)
     max_accel_relaxed_cartesian = MaxAccelCartesianVelCurve(vel_range, MAX_ACC_ORTH, MAX_ACC_PARALLEL, APPROACH_SPEED_MINIMUM_DEFAULT)
 
     # Draw Velocity Curves
     draw_Vel_Curves(ax_V_parallel, ax_V_orthogonal, tj_npfg, track_error_range, v_path, TJ_NPFG_LEGEND, TJ_NPFG_COLOR)
-    draw_Vel_Curves(ax_V_parallel, ax_V_orthogonal, tj_npfg_bf_stripped, track_error_range, v_path, TJ_NPFG_BF_STRIPPED_LABEL, TJ_NPFG_BF_STRIPPED_COLOR)
+    # draw_Vel_Curves(ax_V_parallel, ax_V_orthogonal, tj_npfg_bf_stripped, track_error_range, v_path, TJ_NPFG_BF_STRIPPED_LABEL, TJ_NPFG_BF_STRIPPED_COLOR)
     draw_Vel_Curves(ax_V_parallel, ax_V_orthogonal, tj_npfg_squashed, track_error_range, v_path, TJ_NPFG_BF_STRIPPED_V_PATH_SQUASHED_LABEL, TJ_NPFG_BF_STRIPPED_V_PATH_SQUASHED_COLOR)
     
     draw_Vel_Curves(ax_V_parallel, ax_V_orthogonal, tj_npfg_cartesian_v_approach_min, track_error_range, v_path, TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_LABEL, TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_COLOR)
@@ -180,8 +180,8 @@ def drawCurves(ax_V_parallel, ax_V_orthogonal, ax_Acc_parallel, ax_Acc_orthogona
 
     # Draw auxilary Curves
     draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, tj_npfg, track_error_range, v_path, TJ_NPFG_LEGEND, TJ_NPFG_COLOR)
-    draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, tj_npfg_bf_stripped, track_error_range, v_path, TJ_NPFG_BF_STRIPPED_LABEL, TJ_NPFG_BF_STRIPPED_COLOR)
-    draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, tj_npfg_squashed, track_error_range, v_path, TJ_NPFG_BF_STRIPPED_V_PATH_SQUASHED_LABEL, TJ_NPFG_BF_STRIPPED_V_PATH_SQUASHED_COLOR)
+    # draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, tj_npfg_bf_stripped, track_error_range, v_path, TJ_NPFG_BF_STRIPPED_LABEL, TJ_NPFG_BF_STRIPPED_COLOR)
+    # draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, tj_npfg_squashed, track_error_range, v_path, TJ_NPFG_BF_STRIPPED_V_PATH_SQUASHED_LABEL, TJ_NPFG_BF_STRIPPED_V_PATH_SQUASHED_COLOR)
     draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, tj_npfg_cartesian_v_approach_min, track_error_range, v_path, TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_LABEL, TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_COLOR)
     draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, max_accel_relaxed_cartesian, track_error_range, v_path, RELAXED_MAX_ACCEL_CARTESIAN_LABEL, RELAXED_MAX_ACCEL_CARTESIAN_COLOR)
 
