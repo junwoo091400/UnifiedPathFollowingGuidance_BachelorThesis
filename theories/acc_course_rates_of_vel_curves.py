@@ -27,8 +27,7 @@ TRACK_ERROR_MAX = 70 # [m] Maximum track error we simulate (in Y-direction, as p
 GRID_SIZE = 1.0 # [m] Interval that data will be calculated along track error axis
 
 # User adjustable
-# IS_MC = True
-IS_MC = False # Fixed-Wing
+IS_MC = True
 
 if IS_MC:
     # Multicopter constraints
@@ -42,14 +41,6 @@ else:
     VELOCITY_MAX = 15.0
 
 PATH_DESIRED_SPEED = 7.0 # [m/s] Desired speed on path
-APPROACH_SPEED_MINIMUM_DEFAULT = 7.5
-
-TJ_NPFG_TRACK_KEEPING_SPD = 9.0 # Max minimum track keeping ground speed variable (only for TJ NPFG derived algorithms)
-
-MAX_ACC_ORTH = 7.0
-MAX_ACC_PARALLEL = 7.0
-
-GROUND_SPEED_DEFAULT = 6.0 # Only should be used by TJ NPFG
 
 # Calculated
 VELOCITY_RANGE_DEFAULT = np.array([VELOCITY_MIN, VELOCITY_NOM, VELOCITY_MAX])
@@ -125,6 +116,14 @@ def drawCurves(ax_V_parallel, ax_V_orthogonal, ax_Acc_parallel, ax_Acc_orthogona
     '''
     assert np.shape(vel_range) == VELOCITY_RANGE_SHAPE
 
+    # Algorithm parameters
+    APPROACH_SPEED_MINIMUM_DEFAULT = 0.0 # Disable V_approach_min, as V_nom !=0 now
+    TJ_NPFG_TRACK_KEEPING_SPD = 0.0 # Max minimum track keeping ground speed variable (only for TJ NPFG derived algorithms)
+    GROUND_SPEED_DEFAULT = vel_range[1] # Only should be used by TJ NPFG
+
+    MAX_ACC_ORTH = 7.0
+    MAX_ACC_PARALLEL = 7.0
+
     # Clear the plots
     ax_V_parallel.cla()
     ax_V_orthogonal.cla()
@@ -193,8 +192,12 @@ def drawCurves(ax_V_parallel, ax_V_orthogonal, ax_Acc_parallel, ax_Acc_orthogona
     V_MAX_COLOR = 'mistyrose'
     ax_V_orthogonal.fill_between(track_error_range, vel_range[0], vel_range[1], color=V_NOM_COLOR)
     ax_V_parallel.fill_between(track_error_range, vel_range[0], vel_range[1], color=V_NOM_COLOR)
-    ax_V_orthogonal.fill_between(track_error_range, vel_range[1], vel_range[2], color=V_MAX_COLOR)
-    ax_V_parallel.fill_between(track_error_range, vel_range[1], vel_range[2], color=V_MAX_COLOR)
+    
+    # ax_V_orthogonal.fill_between(track_error_range, vel_range[1], vel_range[2], color=V_MAX_COLOR)
+    # ax_V_parallel.fill_between(track_error_range, vel_range[1], vel_range[2], color=V_MAX_COLOR)
+    
+    ax_norm.fill_between(track_error_range, vel_range[0], vel_range[1], color=V_NOM_COLOR)
+    # ax_norm.fill_between(track_error_range, vel_range[1], vel_range[2], color=V_MAX_COLOR)
 
     # Velocity cutoff range draw
     APPROACH_SPEED_MINIMUM_LABEL = 'V_approach_minimum'
@@ -210,9 +213,9 @@ def drawCurves(ax_V_parallel, ax_V_orthogonal, ax_Acc_parallel, ax_Acc_orthogona
     # Legend: https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.legend.html
     ax_V_parallel.legend(loc='upper right')
     ax_V_orthogonal.legend(loc='upper right')
-    ax_norm.legend()
-    ax_course_rates.legend()
-    ax_track.legend()
+    ax_norm.legend(loc='upper right')
+    ax_course_rates.legend(loc='upper right')
+    ax_track.legend(loc='upper right')
 
 def main():
     # Runtime variables (used in slider callback)
@@ -221,7 +224,7 @@ def main():
 
     # Draw
     fig = plt.figure(figsize=(12, 10))
-    fig.suptitle("Vnom {}m/s, Vmax {}m/s, Vpath {} m/s, Vg = {}m/s, Vapproach_min = {}m/s".format(VELOCITY_RANGE_DEFAULT[1], VELOCITY_RANGE_DEFAULT[2], PATH_DESIRED_SPEED, GROUND_SPEED_DEFAULT, APPROACH_SPEED_MINIMUM_DEFAULT))
+    fig.suptitle("Vnom {}m/s, Vmax {}m/s, Vpath {} m/s".format(vel_range[1], vel_range[2], v_path))
 
     # Create Axes
     # https://matplotlib.org/3.1.0/api/_as_gen/matplotlib.figure.Figure.html#matplotlib.figure.Figure.add_subplot
@@ -248,7 +251,7 @@ def main():
 
         drawCurves(ax_V_parallel, ax_V_orthogonal, ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, v_path, vel_range)
 
-        fig.suptitle("Vnom {}m/s, Vmax {}m/s, Vpath {} m/s, Vg = {}m/s, Vapproach_min = {}m/s".format(vel_range[1], vel_range[2], v_path, GROUND_SPEED_DEFAULT, APPROACH_SPEED_MINIMUM_DEFAULT))
+        fig.suptitle("Vnom {}m/s, Vmax {}m/s, Vpath {} m/s".format(vel_range[1], vel_range[2], v_path))
         fig.subplots_adjust(bottom=0.1) # Leave margin in bottom for the slider
         fig.canvas.draw_idle()
 
