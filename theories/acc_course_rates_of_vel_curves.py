@@ -27,7 +27,7 @@ TRACK_ERROR_MAX = 70 # [m] Maximum track error we simulate (in Y-direction, as p
 GRID_SIZE = 1.0 # [m] Interval that data will be calculated along track error axis
 
 # User adjustable
-IS_MC = True
+IS_MC = False
 
 if IS_MC:
     # Multicopter constraints
@@ -61,7 +61,7 @@ TJ_NPFG_BF_STRIPPED_V_PATH_SQUASHED_COLOR = 'pink'
 TJ_NPFG_BF_STRIPPED_V_PATH_SQUASHED_LABEL = 'TJ NPFG squashed'
 
 TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_COLOR = 'r'
-TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_LABEL = 'TJ NPFG Cartesian decoupling'
+TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_LABEL = 'TJ NPFG squashed extended'
 
 RELAXED_MAX_ACCEL_CARTESIAN_COLOR = 'brown'
 RELAXED_MAX_ACCEL_CARTESIAN_LABEL = 'Relaxed Max Acc Cartesian'
@@ -181,7 +181,7 @@ def drawCurves(ax_V_parallel, ax_V_orthogonal, ax_Acc_parallel, ax_Acc_orthogona
     # Draw auxilary Curves
     draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, tj_npfg, track_error_range, v_path, TJ_NPFG_LEGEND, TJ_NPFG_COLOR)
     # draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, tj_npfg_bf_stripped, track_error_range, v_path, TJ_NPFG_BF_STRIPPED_LABEL, TJ_NPFG_BF_STRIPPED_COLOR)
-    # draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, tj_npfg_squashed, track_error_range, v_path, TJ_NPFG_BF_STRIPPED_V_PATH_SQUASHED_LABEL, TJ_NPFG_BF_STRIPPED_V_PATH_SQUASHED_COLOR)
+    draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, tj_npfg_squashed, track_error_range, v_path, TJ_NPFG_BF_STRIPPED_V_PATH_SQUASHED_LABEL, TJ_NPFG_BF_STRIPPED_V_PATH_SQUASHED_COLOR)
     draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, tj_npfg_cartesian_v_approach_min, track_error_range, v_path, TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_LABEL, TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_COLOR)
     draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, max_accel_relaxed_cartesian, track_error_range, v_path, RELAXED_MAX_ACCEL_CARTESIAN_LABEL, RELAXED_MAX_ACCEL_CARTESIAN_COLOR)
 
@@ -204,7 +204,7 @@ def drawCurves(ax_V_parallel, ax_V_orthogonal, ax_Acc_parallel, ax_Acc_orthogona
     ax_V_orthogonal.axhline(APPROACH_SPEED_MINIMUM_DEFAULT, xmin=np.min(track_error_range), xmax=np.max(track_error_range), color='grey', linestyle=VEL_CONSTRAINTS_PLOT_STYLE, label=APPROACH_SPEED_MINIMUM_LABEL)
 
     PATH_DESIRED_SPEED_LABEL = 'V_path'
-    ax_V_parallel.axhline(PATH_DESIRED_SPEED, xmin=np.min(track_error_range), xmax=np.max(track_error_range), color='grey', linestyle=VEL_CONSTRAINTS_PLOT_STYLE, label=PATH_DESIRED_SPEED_LABEL)
+    ax_V_parallel.axhline(v_path, xmin=np.min(track_error_range), xmax=np.max(track_error_range), color='grey', linestyle=VEL_CONSTRAINTS_PLOT_STYLE, label=PATH_DESIRED_SPEED_LABEL)
 
     TJ_NPFG_TRACK_KEEPING_SPD_LABEL = 'V_tk'
     TJ_NPFG_TRACK_KEEPING_SPD_COLOR = 'orange'

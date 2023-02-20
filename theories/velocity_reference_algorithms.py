@@ -568,7 +568,7 @@ class MaxAccelCartesianVelCurve(VelocityReferenceCurves):
         '''
         Calculate semi-relaxed track error boundary with 
         '''
-        self.v_approach = np.max([self.vel_range[1], self.v_approach_min, v_path])
+        self.v_approach = np.max([self.vel_range[1], self.v_approach_min, v_path]) # Does it makes sense to consider V_path here?
 
         # Calculate most aggressive track error boundary for given V_approach
         e_min_approach = self.calculate_e_min_approach_for_S_orth_max_acc(self.v_approach, self.max_acc_orth)
