@@ -28,20 +28,21 @@ UNICYCLIC_COLOR = 'red'
 HYBRID_UNICYCLIC_COLOR = 'green'
 MAX_ACCEL_COLOR = 'brown'
 
-# Environment constraints
+# Vehicle constraints
 MIN_VELOCITY = 0.0
 NOM_VELOCITY = 6.0
 MAX_VELOCITY = 15.0
 VEL_RANGE = np.array([MIN_VELOCITY, NOM_VELOCITY, MAX_VELOCITY])
+MAX_ACCELERATION = 7.0 # [m/s^2] Max Accel in both X and Y direction
 
-V_PATH = 10.0
-
-MAX_ACCELERATION = 5.0 # [m/s^2] Max Accel in both X and Y direction
+# User settings
+V_PATH = 2.0
+MAX_ACCELERATION_PATH_FOLLOWING = 2.0 # [m/s^2] Max Accel in both X and Y direction for Max Accel formulation
 TRACK_KEEPING_SPEED_DEFAULT = 0.0 # Disable track keeping
 V_APPROACH_MIN_DEFAULT = 0.0 # Disable V_approach_min
 
 # World
-WORLD_WIDTH_DEFAULT = 150.0 # [m] Default simulated world width (also height)
+WORLD_WIDTH_DEFAULT = 200.0 # [m] Default simulated world width (also height)
 PATH_BEARING_DEG_DEFAULT = 0.0
 PATH_CURVATURE_DEFAULT = 0.0
 
@@ -118,7 +119,6 @@ class TrackRecord:
         signed_track_error = np.cross(unit_path_tangent, position_error_vec) # If positive, vehicle is on left side of path
 
         self.air_vel_ref = self.velCurve.calculate_velRef(np.abs(signed_track_error), V_PATH)
-        print(self.name, signed_track_error, self.air_vel_ref)
 
         if signed_track_error > 0:
             # NOTE: This only makes sense when path is on X-axis.
@@ -183,7 +183,7 @@ class MC_velCurve_pointMass(unittest.TestCase):
         self.trackRecords = []
         self.trackRecords.append(TrackRecord(HybridUnicyclic(VEL_RANGE, V_APPROACH_MIN_DEFAULT), 'Hybrid Unicyclic', path_bearing_deg, path_curvature, vehicle_speed, world_width, HYBRID_UNICYCLIC_COLOR))
         self.trackRecords.append(TrackRecord(Unicyclic(VEL_RANGE, GROUND_SPEED_DEFAULT, TRACK_KEEPING_SPEED_DEFAULT), 'Unicyclic', path_bearing_deg, path_curvature, vehicle_speed, world_width, UNICYCLIC_COLOR))
-        self.trackRecords.append(TrackRecord(MaxAccelCartesianVelCurve(VEL_RANGE, MAX_ACCELERATION, MAX_ACCELERATION, V_APPROACH_MIN_DEFAULT), 'Max Acc', path_bearing_deg, path_curvature, vehicle_speed, world_width, MAX_ACCEL_COLOR))
+        self.trackRecords.append(TrackRecord(MaxAccelCartesianVelCurve(VEL_RANGE, MAX_ACCELERATION_PATH_FOLLOWING, MAX_ACCELERATION_PATH_FOLLOWING, V_APPROACH_MIN_DEFAULT), 'Max Acc', path_bearing_deg, path_curvature, vehicle_speed, world_width, MAX_ACCEL_COLOR))
 
         # Runtime user settings
         self._stop_every_1_sec = stop_every_1sec
@@ -355,8 +355,6 @@ class MC_velCurve_pointMass(unittest.TestCase):
                     vel_array = np.concatenate((vel_array, [vel]))
                     acc_array = np.concatenate((acc_array, [acc]))
 
-            # print(np.array(list(map(MCPointMass.decode_state, [MCPointMass]*len(states), states))).shape)
-
             # Post processing
             track_error_array = np.cross(self.path_unit_tangent_vec, pos_array - self.path_position)
 
@@ -364,6 +362,11 @@ class MC_velCurve_pointMass(unittest.TestCase):
             ax_V_parallel.plot(track_error_array, vel_array[:, 0], label=curve_name, marker=MARKER_TYPE, color=color)
             # Invert orth vel, as the sign convention is different
             ax_V_orthogonal.plot(track_error_array, -vel_array[:, 1], label=curve_name, marker=MARKER_TYPE, color=color)
+
+            ax_Acc_parallel.plot(track_error_array, acc_array[:, 0], label=curve_name, marker=MARKER_TYPE, color=color)
+            ax_Acc_orthogonal.plot(track_error_array, -acc_array[:, 1], label=curve_name, marker=MARKER_TYPE, color=color)
+
+            ax_norm.plot(track_error_array, np.linalg.norm(vel_array, axis=1), label=curve_name, marker=MARKER_TYPE, color=color)
 
             # Draw Track Error Boundaries
             ax_V_parallel.axvline(velCurveObj.get_track_error_boundary(), ymin=np.min(track_error_array), ymax=np.max(track_error_array), color=color, linestyle=TRACK_ERROR_BOUNDARY_STYLE)
@@ -374,6 +377,7 @@ class MC_velCurve_pointMass(unittest.TestCase):
             vel_data = velCurveObj.calculate_velRef_array(track_error_array, V_PATH)
             ax_V_parallel.plot(track_error_array, vel_data[0], marker=GROUND_TRUTH_MARKER_TYPE, linestyle=GROUND_TRUTH_LINE_STYPE, color=color)
             ax_V_orthogonal.plot(track_error_array, vel_data[1], marker=GROUND_TRUTH_MARKER_TYPE, linestyle=GROUND_TRUTH_LINE_STYPE, color=color)
+            ax_norm.plot(track_error_array, np.sqrt(np.square(vel_data[0])+np.square(vel_data[1])), marker=GROUND_TRUTH_MARKER_TYPE, linestyle=GROUND_TRUTH_LINE_STYPE, color=color)
 
         # Legend: https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.legend.html
         ax_V_parallel.legend(loc='upper right')
