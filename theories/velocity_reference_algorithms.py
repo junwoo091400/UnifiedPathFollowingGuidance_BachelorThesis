@@ -564,6 +564,33 @@ class MaxAccelCartesianVelCurve(VelocityReferenceCurves):
         assert self.e_min_path <= track_error_bound, "Minimum track error boundary for achieving V_path must be smaller than track error bound of orthogonal velocity curve!"
         return np.piecewise(track_error_range, [track_error_range < track_error_bound, track_error_range >= track_error_bound], [lambda e : v_path*(1-np.sqrt(e/track_error_bound)), 0])
 
+    def calculate_velRef(self, track_error, v_path):
+        '''
+        Calculate semi-relaxed velocity curve
+        '''
+        # Don't include V_path as argument to V_approach, always approach at V_nom (if V_approach_min = 0)
+        self.v_approach = np.max([self.vel_range[1], self.v_approach_min]) # Does it makes sense to consider V_path here?
+
+        # Calculate most aggressive track error boundary for given V_approach
+        e_min_approach = self.calculate_e_min_approach_for_S_orth_max_acc(self.v_approach, self.max_acc_orth)
+        # Calculate most aggressive track error boundary for given V_path, with max acc orthogonal velocity curve (e_min_approach)
+        e_min_path = self.calculate_e_min_path_for_relaxed_S_orth_max_acc(v_path, self.max_acc_parallel, self.v_approach, e_min_approach)
+    
+        # Check if choosing optimal solution (minimum track error boundary) is feasible
+        if e_min_approach < e_min_path:
+            e_min_approach = e_min_path = (v_path * self.v_approach)/(2*self.max_acc_parallel)
+
+        # Choose the bigger track error boundary (physical lower limit)
+        self.track_error_boundary = np.max([e_min_approach, e_min_path])
+
+        normalized_track_error = np.clip(track_error/self.track_error_boundary, 0, 1)
+
+        # Calculate velocity curves
+        V_orth = self.v_approach * np.sqrt(normalized_track_error)
+        V_parallel = v_path * (1 - np.sqrt(normalized_track_error))
+
+        return np.array([V_parallel, V_orth])
+
     def calculate_velRef_array(self, track_error, v_path):
         '''
         Calculate semi-relaxed track error boundary with 
