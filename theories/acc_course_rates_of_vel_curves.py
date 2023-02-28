@@ -64,7 +64,7 @@ TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_COLOR = 'green'
 TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_LABEL = 'Hybrid Unicyclic'
 
 RELAXED_MAX_ACCEL_CARTESIAN_COLOR = 'brown'
-RELAXED_MAX_ACCEL_CARTESIAN_LABEL = 'Relaxed Max Acc Cartesian'
+RELAXED_MAX_ACCEL_CARTESIAN_LABEL = 'Maximum Acceleration'
 
 # Vehicle constraints
 # MC_ACC_PATH_ORTH
@@ -121,8 +121,8 @@ def drawCurves(ax_V_parallel, ax_V_orthogonal, ax_Acc_parallel, ax_Acc_orthogona
     TJ_NPFG_TRACK_KEEPING_SPD = 0.0 # Max minimum track keeping ground speed variable (only for TJ NPFG derived algorithms). This essentially demoishes the purpose of having BF stripped formulation (for max track keeping vel input)
     GROUND_SPEED_DEFAULT = vel_range[1] # Only should be used by TJ NPFG
 
-    MAX_ACC_ORTH = 7.0
-    MAX_ACC_PARALLEL = 7.0
+    MAX_ACC_ORTH = 4.0
+    MAX_ACC_PARALLEL = 4.0
 
     # Clear the plots
     ax_V_parallel.cla()
@@ -163,27 +163,29 @@ def drawCurves(ax_V_parallel, ax_V_orthogonal, ax_Acc_parallel, ax_Acc_orthogona
     track_error_range = np.arange(0.0, TRACK_ERROR_MAX + GRID_SIZE/2, GRID_SIZE)
 
     # Instances for each algorithms
-    unicyclic = TjNpfg(vel_range, GROUND_SPEED_DEFAULT, TJ_NPFG_TRACK_KEEPING_SPD)
+    unicyclic = Unicyclic(vel_range, GROUND_SPEED_DEFAULT, TJ_NPFG_TRACK_KEEPING_SPD)
     # tj_npfg_bf_stripped = TjNpfgBearingFeasibilityStripped(vel_range, GROUND_SPEED_DEFAULT, TJ_NPFG_TRACK_KEEPING_SPD)
     # tj_npfg_squashed = TjNpfgBearingFeasibilityStrippedVpathSquashed(vel_range, GROUND_SPEED_DEFAULT, TJ_NPFG_TRACK_KEEPING_SPD)
-    hybrid_unicyclic = TjNpfgCartesianlVapproachMin(vel_range, APPROACH_SPEED_MINIMUM_DEFAULT)
+    hybrid_unicyclic = HybridUnicyclic(vel_range, APPROACH_SPEED_MINIMUM_DEFAULT)
     max_accel_relaxed_cartesian = MaxAccelCartesianVelCurve(vel_range, MAX_ACC_ORTH, MAX_ACC_PARALLEL, APPROACH_SPEED_MINIMUM_DEFAULT)
 
     # Draw Velocity Curves
-    draw_Vel_Curves(ax_V_parallel, ax_V_orthogonal, unicyclic, track_error_range, v_path, TJ_NPFG_LEGEND, TJ_NPFG_COLOR)
+    # draw_Vel_Curves(ax_V_parallel, ax_V_orthogonal, unicyclic, track_error_range, v_path, TJ_NPFG_LEGEND, TJ_NPFG_COLOR)
+    
     # draw_Vel_Curves(ax_V_parallel, ax_V_orthogonal, tj_npfg_bf_stripped, track_error_range, v_path, TJ_NPFG_BF_STRIPPED_LABEL, TJ_NPFG_BF_STRIPPED_COLOR)
     # draw_Vel_Curves(ax_V_parallel, ax_V_orthogonal, tj_npfg_squashed, track_error_range, v_path, TJ_NPFG_BF_STRIPPED_V_PATH_SQUASHED_LABEL, TJ_NPFG_BF_STRIPPED_V_PATH_SQUASHED_COLOR)
     draw_Vel_Curves(ax_V_parallel, ax_V_orthogonal, hybrid_unicyclic, track_error_range, v_path, TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_LABEL, TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_COLOR)
     
-    # draw_Vel_Curves(ax_V_parallel, ax_V_orthogonal, max_accel_relaxed_cartesian, track_error_range, v_path, RELAXED_MAX_ACCEL_CARTESIAN_LABEL, RELAXED_MAX_ACCEL_CARTESIAN_COLOR)
+    draw_Vel_Curves(ax_V_parallel, ax_V_orthogonal, max_accel_relaxed_cartesian, track_error_range, v_path, RELAXED_MAX_ACCEL_CARTESIAN_LABEL, RELAXED_MAX_ACCEL_CARTESIAN_COLOR)
 
     # Draw auxilary Curves
-    draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, unicyclic, track_error_range, v_path, TJ_NPFG_LEGEND, TJ_NPFG_COLOR)
+    # draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, unicyclic, track_error_range, v_path, TJ_NPFG_LEGEND, TJ_NPFG_COLOR)
+    
     # draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, tj_npfg_bf_stripped, track_error_range, v_path, TJ_NPFG_BF_STRIPPED_LABEL, TJ_NPFG_BF_STRIPPED_COLOR)
     # draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, tj_npfg_squashed, track_error_range, v_path, TJ_NPFG_BF_STRIPPED_V_PATH_SQUASHED_LABEL, TJ_NPFG_BF_STRIPPED_V_PATH_SQUASHED_COLOR)
     draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, hybrid_unicyclic, track_error_range, v_path, TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_LABEL, TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_COLOR)
     
-    # draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, max_accel_relaxed_cartesian, track_error_range, v_path, RELAXED_MAX_ACCEL_CARTESIAN_LABEL, RELAXED_MAX_ACCEL_CARTESIAN_COLOR)
+    draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, max_accel_relaxed_cartesian, track_error_range, v_path, RELAXED_MAX_ACCEL_CARTESIAN_LABEL, RELAXED_MAX_ACCEL_CARTESIAN_COLOR)
 
     # Velocity constraints plot
     VEL_CONSTRAINTS_PLOT_STYLE = 'dashed'
@@ -266,7 +268,7 @@ def main():
 
         drawCurves(ax_V_parallel, ax_V_orthogonal, ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, v_path, vel_range)
 
-        fig.suptitle("Vnom {}m/s, Vmax {}m/s, Vpath {} m/s, Vg = {}m/s, Vapproach_min = {}m/s".format(vel_range[1], vel_range[2], v_path, GROUND_SPEED_DEFAULT, APPROACH_SPEED_MINIMUM_DEFAULT))
+        fig.suptitle("Vnom {}m/s, Vmax {}m/s, Vpath {} m/s".format(vel_range[1], vel_range[2], v_path))
         fig.subplots_adjust(bottom=0.1) # Leave margin in bottom for the slider
         fig.canvas.draw_idle()
 

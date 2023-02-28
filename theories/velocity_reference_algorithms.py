@@ -250,7 +250,7 @@ class VelocityReferenceCurves:
         '''
         assert False, "get_track_error_boundary of base class shouldn't be used directly!"
 
-class TjNpfg(VelocityReferenceCurves):
+class Unicyclic(VelocityReferenceCurves):
     def __init__(self, vel_range, ground_speed, track_keeping_speed):
         # Initialize class
         super().__init__(vel_range)
@@ -288,7 +288,7 @@ class TjNpfg(VelocityReferenceCurves):
     def get_track_error_boundary(self):
         return self.npfg.d_track_error_bound
 
-class TjNpfgBearingFeasibilityStripped(TjNpfg):
+class TjNpfgBearingFeasibilityStripped(Unicyclic):
     '''
     This is a simplified implementation of TJ's NPFG, with the bearing feasibility functionality stripped.
 
@@ -304,7 +304,7 @@ class TjNpfgBearingFeasibilityStripped(TjNpfg):
     And it includes the assumptions of:
     '''
 
-    # Constructor is shared with TjNpfg class
+    # Constructor is shared with Unicyclic class
 
     def calculate_velRef(self, track_error, v_path):
         '''
@@ -336,7 +336,7 @@ class TjNpfgBearingFeasibilityStripped(TjNpfg):
         # doesn't get set. So we need to cache the bound independently!!
         return self.track_error_bound
 
-class TjNpfgBearingFeasibilityStrippedVpathSquashed(TjNpfg):
+class TjNpfgBearingFeasibilityStrippedVpathSquashed(Unicyclic):
     '''
     This is a simplified implementation of TJ's NPFG, with the bearing feasibility functionality stripped & taking V_path into account
     by squashing the V_nom (needs to be set to *nominal speed, can't just be 0!!!)
@@ -402,7 +402,7 @@ class TjNpfgBearingFeasibilityStrippedVpathSquashed(TjNpfg):
         # doesn't get set. So we need to cache the bound independently!!
         return self.track_error_bound
 
-class TjNpfgCartesianlVapproachMin(TjNpfg):
+class HybridUnicyclic(Unicyclic):
     '''
     On top of TJ's NPFG:
     - Includes 'V_approach_min', which guarantees that vehicles approaches the path at minimum this (ground) speed
@@ -568,13 +568,18 @@ class MaxAccelCartesianVelCurve(VelocityReferenceCurves):
         '''
         Calculate semi-relaxed track error boundary with 
         '''
-        self.v_approach = np.max([self.vel_range[1], self.v_approach_min, v_path]) # Does it makes sense to consider V_path here?
+        # Don't include V_path as argument to V_approach, always approach at V_nom (if V_approach_min = 0)
+        self.v_approach = np.max([self.vel_range[1], self.v_approach_min]) # Does it makes sense to consider V_path here?
 
         # Calculate most aggressive track error boundary for given V_approach
         e_min_approach = self.calculate_e_min_approach_for_S_orth_max_acc(self.v_approach, self.max_acc_orth)
         # Calculate most aggressive track error boundary for given V_path, with max acc orthogonal velocity curve (e_min_approach)
         e_min_path = self.calculate_e_min_path_for_relaxed_S_orth_max_acc(v_path, self.max_acc_parallel, self.v_approach, e_min_approach)
     
+        # Check if choosing optimal solution (minimum track error boundary) is feasible
+        if e_min_approach < e_min_path:
+            e_min_approach = e_min_path = (v_path * self.v_approach)/(2*self.max_acc_parallel)
+
         # Choose the bigger track error boundary (physical lower limit)
         self.track_error_boundary = np.max([e_min_approach, e_min_path])
 

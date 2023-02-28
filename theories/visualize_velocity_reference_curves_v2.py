@@ -85,9 +85,9 @@ def main():
     grid_data = np.empty((PF_ALGORITHMS_COUNT, track_error_len, 2))
 
     # Instances for each algorithms
-    tj_npfg = TjNpfg(VELOCITY_RANGE_DEFAULT, GROUND_SPEED_DEFAULT, TJ_NPFG_TRACK_KEEPING_SPD)
+    tj_npfg = Unicyclic(VELOCITY_RANGE_DEFAULT, GROUND_SPEED_DEFAULT, TJ_NPFG_TRACK_KEEPING_SPD)
     tj_npfg_bf_stripped = TjNpfgBearingFeasibilityStripped(VELOCITY_RANGE_DEFAULT, GROUND_SPEED_DEFAULT, TJ_NPFG_TRACK_KEEPING_SPD)
-    tj_npfg_cartesian_v_approach_min = TjNpfgCartesianlVapproachMin(VELOCITY_RANGE_DEFAULT, APPROACH_SPEED_MINIMUM_DEFAULT)
+    tj_npfg_cartesian_v_approach_min = HybridUnicyclic(VELOCITY_RANGE_DEFAULT, APPROACH_SPEED_MINIMUM_DEFAULT)
     max_accel_relaxed_cartesian = MaxAccelCartesianVelCurve(VELOCITY_RANGE_DEFAULT, MAX_ACC_ORTH, MAX_ACC_PARALLEL, APPROACH_SPEED_MINIMUM_DEFAULT)
 
     # Calculation for Vector Field
