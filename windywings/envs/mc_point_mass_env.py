@@ -185,6 +185,9 @@ class MCPointMass(gym.Env):
         assert(np.shape(action) == ACTION_SPACE_SHAPE)
 
         pos, vel, acc = self.decode_state(self.state)
+        
+        # Clip action input & decode
+        action = np.clip(action, self.action_space.low, self.action_space.high)
         vel_sp, acc_ff = self.decode_action(action)
 
         # Integrate state
@@ -195,8 +198,9 @@ class MCPointMass(gym.Env):
         acc_fb = (vel_sp - vel) * self.p_vel
         acc = acc_fb + acc_ff
 
-        # Set new state
+        # Clip state
         self.state = np.concatenate((pos, vel, acc), axis=None)
+        self.state = np.clip(self.state, self.min_state, self.max_state)
         assert np.shape(self.state) == STATE_SPACE_SHAPE
 
         # Observation, Reward, Done, Info: https://www.gymlibrary.dev/content/environment_creation/#step
