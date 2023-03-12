@@ -19,7 +19,7 @@ MULTICOPTER_CIRCLE_RADIUS = 10 # Radius of the circle representing vehicle in re
 NOM_VELOCITY = 0.0
 MAX_VELOCITY = 15.0
 MAX_ACCELERATION = 10.0
-WORLD_SIZE_DEFAULT = 100.0 # [m] Default simulated world size
+WORLD_SIZE_DEFAULT = 25.0 # [m] Default simulated world size
 PATH_BEARING_DEG_DEFAULT = 0.0
 PATH_CURVATURE_DEFAULT = 0.0
 
@@ -34,8 +34,8 @@ class MC_npfg_pointmass(unittest.TestCase):
         self.env = gym.make('multicopter-pointmass', world_size=world_size, velocity_bounds=velocity_bound, acceleration_bounds=acceleration_bound)
 
         # Initial state setting
-        pos = np.array([-world_size/2, world_size/8])
-        vel = np.array([vehicle_speed, 0.0])
+        pos = np.array([-world_size/3, world_size/4])
+        vel = np.array([2.0, 0.0]) # Start with almost 0 velocity
         acc = np.array([0.0, 0.0])
         initial_state = np.concatenate((pos, vel, acc), axis=None)
         self.env.reset(initial_state=initial_state)
