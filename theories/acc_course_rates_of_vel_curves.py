@@ -61,7 +61,7 @@ TJ_NPFG_LEGEND = 'Unicyclic'
 # TJ_NPFG_BF_STRIPPED_V_PATH_SQUASHED_LABEL = 'TJ NPFG squashed'
 
 TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_COLOR = 'green'
-TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_LABEL = 'Hybrid Unicyclic'
+TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_LABEL = 'Hybrid'
 
 RELAXED_MAX_ACCEL_CARTESIAN_COLOR = 'brown'
 RELAXED_MAX_ACCEL_CARTESIAN_LABEL = 'Maximum Acceleration'
@@ -164,28 +164,27 @@ def drawCurves(ax_V_parallel, ax_V_orthogonal, ax_Acc_parallel, ax_Acc_orthogona
 
     # Instances for each algorithms
     unicyclic = Unicyclic(vel_range, GROUND_SPEED_DEFAULT, TJ_NPFG_TRACK_KEEPING_SPD)
+    hybrid_unicyclic = HybridUnicyclicUniform(vel_range, vel_range[1]) # Give V_nom as V_approach by default
+
     # tj_npfg_bf_stripped = TjNpfgBearingFeasibilityStripped(vel_range, GROUND_SPEED_DEFAULT, TJ_NPFG_TRACK_KEEPING_SPD)
     # tj_npfg_squashed = TjNpfgBearingFeasibilityStrippedVpathSquashed(vel_range, GROUND_SPEED_DEFAULT, TJ_NPFG_TRACK_KEEPING_SPD)
-    hybrid_unicyclic = HybridUnicyclic(vel_range, APPROACH_SPEED_MINIMUM_DEFAULT)
-    max_accel_relaxed_cartesian = MaxAccelCartesianVelCurve(vel_range, MAX_ACC_ORTH, MAX_ACC_PARALLEL, APPROACH_SPEED_MINIMUM_DEFAULT)
+    # max_accel_relaxed_cartesian = MaxAccelCartesianVelCurve(vel_range, MAX_ACC_ORTH, MAX_ACC_PARALLEL, APPROACH_SPEED_MINIMUM_DEFAULT)
 
     # Draw Velocity Curves
-    # draw_Vel_Curves(ax_V_parallel, ax_V_orthogonal, unicyclic, track_error_range, v_path, TJ_NPFG_LEGEND, TJ_NPFG_COLOR)
-    
+    draw_Vel_Curves(ax_V_parallel, ax_V_orthogonal, unicyclic, track_error_range, v_path, TJ_NPFG_LEGEND, TJ_NPFG_COLOR)  
+    draw_Vel_Curves(ax_V_parallel, ax_V_orthogonal, hybrid_unicyclic, track_error_range, v_path, TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_LABEL, TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_COLOR)
+    # draw_Vel_Curves(ax_V_parallel, ax_V_orthogonal, max_accel_relaxed_cartesian, track_error_range, v_path, RELAXED_MAX_ACCEL_CARTESIAN_LABEL, RELAXED_MAX_ACCEL_CARTESIAN_COLOR)
+
     # draw_Vel_Curves(ax_V_parallel, ax_V_orthogonal, tj_npfg_bf_stripped, track_error_range, v_path, TJ_NPFG_BF_STRIPPED_LABEL, TJ_NPFG_BF_STRIPPED_COLOR)
     # draw_Vel_Curves(ax_V_parallel, ax_V_orthogonal, tj_npfg_squashed, track_error_range, v_path, TJ_NPFG_BF_STRIPPED_V_PATH_SQUASHED_LABEL, TJ_NPFG_BF_STRIPPED_V_PATH_SQUASHED_COLOR)
-    draw_Vel_Curves(ax_V_parallel, ax_V_orthogonal, hybrid_unicyclic, track_error_range, v_path, TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_LABEL, TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_COLOR)
-    
-    draw_Vel_Curves(ax_V_parallel, ax_V_orthogonal, max_accel_relaxed_cartesian, track_error_range, v_path, RELAXED_MAX_ACCEL_CARTESIAN_LABEL, RELAXED_MAX_ACCEL_CARTESIAN_COLOR)
-
+  
     # Draw auxilary Curves
-    # draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, unicyclic, track_error_range, v_path, TJ_NPFG_LEGEND, TJ_NPFG_COLOR)
-    
+    draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, unicyclic, track_error_range, v_path, TJ_NPFG_LEGEND, TJ_NPFG_COLOR)
+    draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, hybrid_unicyclic, track_error_range, v_path, TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_LABEL, TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_COLOR)
+
     # draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, tj_npfg_bf_stripped, track_error_range, v_path, TJ_NPFG_BF_STRIPPED_LABEL, TJ_NPFG_BF_STRIPPED_COLOR)
     # draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, tj_npfg_squashed, track_error_range, v_path, TJ_NPFG_BF_STRIPPED_V_PATH_SQUASHED_LABEL, TJ_NPFG_BF_STRIPPED_V_PATH_SQUASHED_COLOR)
-    draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, hybrid_unicyclic, track_error_range, v_path, TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_LABEL, TJ_NPFG_BF_CARTESIAN_V_APPROACH_MIN_COLOR)
-    
-    draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, max_accel_relaxed_cartesian, track_error_range, v_path, RELAXED_MAX_ACCEL_CARTESIAN_LABEL, RELAXED_MAX_ACCEL_CARTESIAN_COLOR)
+    # draw_aux_curves(ax_Acc_parallel, ax_Acc_orthogonal, ax_norm, ax_course_rates, ax_track, max_accel_relaxed_cartesian, track_error_range, v_path, RELAXED_MAX_ACCEL_CARTESIAN_LABEL, RELAXED_MAX_ACCEL_CARTESIAN_COLOR)
 
     # Velocity constraints plot
     VEL_CONSTRAINTS_PLOT_STYLE = 'dashed'
@@ -202,15 +201,15 @@ def drawCurves(ax_V_parallel, ax_V_orthogonal, ax_Acc_parallel, ax_Acc_orthogona
     # ax_norm.fill_between(track_error_range, vel_range[1], vel_range[2], color=V_MAX_COLOR)
 
     # Velocity cutoff range draw
-    APPROACH_SPEED_MINIMUM_LABEL = 'V_approach_minimum'
-    ax_V_orthogonal.axhline(APPROACH_SPEED_MINIMUM_DEFAULT, xmin=np.min(track_error_range), xmax=np.max(track_error_range), color='grey', linestyle=VEL_CONSTRAINTS_PLOT_STYLE, label=APPROACH_SPEED_MINIMUM_LABEL)
+    # APPROACH_SPEED_MINIMUM_LABEL = 'V_approach_minimum'
+    # ax_V_orthogonal.axhline(APPROACH_SPEED_MINIMUM_DEFAULT, xmin=np.min(track_error_range), xmax=np.max(track_error_range), color='grey', linestyle=VEL_CONSTRAINTS_PLOT_STYLE, label=APPROACH_SPEED_MINIMUM_LABEL)
 
     PATH_DESIRED_SPEED_LABEL = 'V_path'
     ax_V_parallel.axhline(v_path, xmin=np.min(track_error_range), xmax=np.max(track_error_range), color='grey', linestyle=VEL_CONSTRAINTS_PLOT_STYLE, label=PATH_DESIRED_SPEED_LABEL)
 
-    TJ_NPFG_TRACK_KEEPING_SPD_LABEL = 'V_tk'
-    TJ_NPFG_TRACK_KEEPING_SPD_COLOR = 'orange'
-    ax_V_orthogonal.axhline(TJ_NPFG_TRACK_KEEPING_SPD, xmin=np.min(track_error_range), xmax=np.max(track_error_range), color=TJ_NPFG_TRACK_KEEPING_SPD_COLOR, linestyle=VEL_CONSTRAINTS_PLOT_STYLE, label=TJ_NPFG_TRACK_KEEPING_SPD_LABEL)
+    # TJ_NPFG_TRACK_KEEPING_SPD_LABEL = 'V_tk'
+    # TJ_NPFG_TRACK_KEEPING_SPD_COLOR = 'orange'
+    # ax_V_orthogonal.axhline(TJ_NPFG_TRACK_KEEPING_SPD, xmin=np.min(track_error_range), xmax=np.max(track_error_range), color=TJ_NPFG_TRACK_KEEPING_SPD_COLOR, linestyle=VEL_CONSTRAINTS_PLOT_STYLE, label=TJ_NPFG_TRACK_KEEPING_SPD_LABEL)
 
     # Legend: https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.legend.html
     ax_V_parallel.legend(loc='upper right')
