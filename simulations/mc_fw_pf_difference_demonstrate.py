@@ -27,13 +27,13 @@ HYBRID_UNICYCLIC_UNIFORM_COLOR = 'green'
 
 # Vehicle constraints
 MIN_VELOCITY = 0.0
-NOM_VELOCITY = 15.0
+NOM_VELOCITY = 10.0
 MAX_VELOCITY = 20.0
 VEL_RANGE = np.array([MIN_VELOCITY, NOM_VELOCITY, MAX_VELOCITY])
 MAX_ACCELERATION = 7.0 # [m/s^2] Max Accel in both X and Y direction
 
 # User settings
-V_PATH = 1.0
+V_PATH = 7.0
 TRACK_KEEPING_SPEED_DEFAULT = 0.0 # Disable track keeping
 V_APPROACH_MIN_DEFAULT = 0.0 # Disable V_approach_min
 
@@ -43,7 +43,7 @@ PATH_BEARING_DEG_DEFAULT = 0.0
 PATH_CURVATURE_DEFAULT = 0.0
 
 # Simulation settings
-SIM_DURATION_SEC = 50.0 # [s] How long the simulation will run (`step()` time)
+SIM_DURATION_SEC = 30.0 # [s] How long the simulation will run (`step()` time)
 SIM_TIME_DT = 0.03 # [s] Dt from each `step` (NOTE: Ideally, this should match 1/FPS of the environment, but since we don't render in the environment, this isn't necessary)
 
 def world2screen(coords: np.array, world_width):
@@ -165,7 +165,31 @@ class TrackRecord:
             pygame.draw.aalines(surf, points=xys, closed=False, color=pygame.Color(self.color))
 
         # Draw the Vehicle
-        pygame.draw.circle(surf, pygame.Color(self.color), world2screen(pos, self.world_width), MULTICOPTER_CIRCLE_RADIUS)
+        if self.name == 'Unicyclic':
+            # Draw airplane instead
+            carlength = 20
+            carwidth = 10
+            r, t, b = carlength, 0.5 * carwidth, -0.5 * carwidth
+            coords = []
+            posScreen = world2screen(pos, self.world_width) # Convert to screen pixel scale
+            
+            # Get vehicle yaw from vel (fake)
+            vehicle_yaw = np.arctan2(vel[1], vel[0])
+            
+            from pygame import gfxdraw
+            for c in [(0, t), (0, b), (r, 0)]:
+                c = pygame.math.Vector2(c).rotate_rad(vehicle_yaw)
+                coords.append(
+                    (
+                        c[0] + posScreen[0],
+                        c[1] + posScreen[1]
+                    )
+                )
+            gfxdraw.aapolygon(surf, coords, (0, 0, 0))
+            gfxdraw.filled_polygon(surf, coords, (255, 0, 0)) # Red for unicyclic (airplane)
+        else:
+            # Draw circle (multirotor)
+            pygame.draw.circle(surf, pygame.Color(self.color), world2screen(pos, self.world_width), MULTICOPTER_CIRCLE_RADIUS)
 
     ''' Getters '''
     def get_position(self):
@@ -198,7 +222,7 @@ class MC_velCurve_pointMass(unittest.TestCase):
         # TrackRecords
         self.trackRecords = []
         self.trackRecords.append(TrackRecord(Unicyclic(VEL_RANGE, GROUND_SPEED_DEFAULT, TRACK_KEEPING_SPEED_DEFAULT), 'Unicyclic', path_bearing_deg, path_curvature, vehicle_speed, world_width, UNICYCLIC_COLOR))
-        self.trackRecords.append(TrackRecord(HybridUnicyclicUniform(VEL_RANGE), 'Hybrid Unicyclic Uniform', path_bearing_deg, path_curvature, vehicle_speed, world_width, HYBRID_UNICYCLIC_UNIFORM_COLOR))
+        self.trackRecords.append(TrackRecord(HybridUnicyclicUniform(VEL_RANGE, VEL_RANGE[1]), 'Hybrid Unicyclic Uniform', path_bearing_deg, path_curvature, vehicle_speed, world_width, HYBRID_UNICYCLIC_UNIFORM_COLOR))
 
         # Runtime user settings
         self._stop_every_1_sec = stop_every_1sec
@@ -242,6 +266,12 @@ class MC_velCurve_pointMass(unittest.TestCase):
         # Draw the path target
         self.draw_path(self.path_position, self.path_unit_tangent_vec)        
 
+        # New path to switch to showcase change in path: Stupid copy to just draw extra
+        new_vertical_path_bearing_deg = 90
+        new_vertical_path_position = [80.0, 0.0]
+
+        self.draw_path(new_vertical_path_position, np.array([np.cos(np.deg2rad(new_vertical_path_bearing_deg)), np.sin(np.deg2rad(new_vertical_path_bearing_deg))]))
+
         # Draw on the screen
         self.surf = pygame.transform.flip(self.surf, False, True) # Flips the surface drawing in Y-axis, so that frame coordinate wise, X is RIGHT, Y is UP in the visualization
         self.screen.blit(self.surf, (0, 0))
@@ -257,7 +287,7 @@ class MC_velCurve_pointMass(unittest.TestCase):
         if (np.isfinite(path_start_pos).all() and np.isfinite(path_end_pos).all()):
             # Only draw when the coordinates are finite (defined)
             try:
-                pygame.draw.line(self.surf, (255, 0, 0), path_start_pos, path_end_pos)
+                pygame.draw.line(self.surf, (0, 0, 0), path_start_pos, path_end_pos)
             except Exception as e:
                 print(e)
                 print('Path start: {}, Path end: {}'.format(path_start_pos, path_end_pos))
@@ -292,15 +322,10 @@ class MC_velCurve_pointMass(unittest.TestCase):
                 pos = tr.get_position()
                 if pos is not None:
                     print(pos)
-                    if (np.linalg.norm(pos - new_vertical_path_position) < 20):
+                    if (np.linalg.norm(pos - new_vertical_path_position) < tr.velCurve.get_track_error_boundary()):
                         # Switch path
                         print('Path switched!')
                         tr.setPath(new_vertical_path_bearing_deg, new_vertical_path_position)
-                
-            # Render
-            if self.screen is not None:
-                # Special new path drawing
-                self.draw_path(new_vertical_path_position, np.array([np.cos(np.deg2rad(new_vertical_path_bearing_deg)), np.sin(np.deg2rad(new_vertical_path_bearing_deg))]))
 
             self.render()
 
