@@ -35,7 +35,7 @@ VEL_RANGE = np.array([MIN_VELOCITY, NOM_VELOCITY, MAX_VELOCITY])
 MAX_ACCELERATION = 7.0 # [m/s^2] Max Accel in both X and Y direction
 
 # User settings
-V_PATH = 0.0
+V_PATH = 12.0
 MAX_ACCELERATION_PATH_FOLLOWING = 2.0 # [m/s^2] Max Accel in both X and Y direction for Max Accel formulation
 TRACK_KEEPING_SPEED_DEFAULT = 0.0 # Disable track keeping
 V_APPROACH_MIN_DEFAULT = 0.0 # Disable V_approach_min
