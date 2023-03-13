@@ -402,6 +402,57 @@ class TjNpfgBearingFeasibilityStrippedVpathSquashed(Unicyclic):
         # doesn't get set. So we need to cache the bound independently!!
         return self.track_error_bound
 
+class HybridUnicyclicUniform(Unicyclic):
+    '''
+    Uniform approaching velocity (at V_nom) hybrid unicyclic formulation.
+
+    - Only applies V_path squashing
+
+    NOTE: We don't use the `ground_speed` variable, as we want to decouple that from the definition of v_approach, which should only
+    be about the 'orthogonal' velocity component to the path tangent
+    '''
+    def __init__(self, vel_range, v_approach):
+        GROUND_SPEED_DUMMY = vel_range[1] # We won't be using this part of the algorithm. Put any sane value in.
+        # NOTE: Ideally, when we use legacy NPFG logic (V_path > V_approach), track-keeping part shouldn't interfere.
+        # This was done mostly to do control consistent when using cartesian velocity formulation (where track keeping isn't considered yet)
+        TRACK_KEEPING_SPEED_DUMMY = 0 # We don't use track keeping feature, so set it as dummy value of 0
+        
+        super().__init__(vel_range, GROUND_SPEED_DUMMY, TRACK_KEEPING_SPEED_DUMMY)
+
+        self.v_approach = v_approach # Fixed given V_approach
+
+    def calculate_velRef(self, track_error, v_path):
+        '''
+        Depending on (track_error, v_approach), draw different VF
+
+        v_approach: Desired approaching speed (should ideally be user-configurable, or somehow set to constant by vehicle's actual approach speed)
+
+        One challenge is that v_approach changes across the track_error (if we constantly use vehicle's state to determine the value), and hence
+        the VF will constantly change while approaching the path
+        '''
+        # Set the approach speed
+        v_approach = self.v_approach
+
+        self.track_error_bound = self.npfg.trackErrorBound(v_approach, self.npfg.time_const)
+        normalized_track_error = np.clip(track_error/self.track_error_bound, 0.0, 1.0)
+        
+        look_ahead_ang = self.npfg.lookAheadAngle(normalized_track_error) # LAA solely based on track proximity (normalized)
+
+        # Track proximity starts from 0, and reaches 1 when on path
+        track_proximity = np.sin(look_ahead_ang)
+        # track_proximity = self.npfg.trackProximity(look_ahead_ang)
+        # track_proximity = np.sqrt(track_proximity) # We remove the squared component, to make the curve stiffer at origin (to drive V_orthogonal stepper to the path)
+
+        # Simply apply ramp-in & ramp-out on the Vpath and Vapproach
+        v_parallel = v_path * track_proximity
+        v_orthogonal = v_approach * np.cos(look_ahead_ang) # Doing (1 - sin) gives lower stiffness (as sine curve flattens out around PI/2). So use cosine instead.
+        
+        # Parallel, Orthogonal vel component
+        return np.array([v_parallel, v_orthogonal])
+
+    def get_track_error_boundary(self):
+        return self.track_error_bound
+
 class HybridUnicyclic(Unicyclic):
     '''
     On top of TJ's NPFG:
