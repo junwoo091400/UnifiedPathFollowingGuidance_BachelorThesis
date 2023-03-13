@@ -25,6 +25,12 @@ Contents of this repository breaks down into following categories:
 6. [Thesis LaTeX source & final file](thesis_latex)
 7. Other related files
 
+## Final Presentation
+
+Please find the recording of the final presentation (March 13th, 2023) here: https://www.youtube.com/watch?v=29x5HsqHXAs
+
+The slides for the presentation can be found at [final_presentation](./final_presentation)
+
 ## Contact
 
 If you have any questions about the research, please don't hesitate to reach out to me via email in the final Thesis paper!
