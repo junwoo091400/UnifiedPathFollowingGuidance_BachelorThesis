@@ -27,6 +27,7 @@ MULTICOPTER_CIRCLE_RADIUS = 10 # Radius of the circle representing vehicle in re
 UNICYCLIC_COLOR = 'red'
 HYBRID_UNICYCLIC_COLOR = 'green'
 MAX_ACCEL_COLOR = 'brown'
+HYBRID_UNICYCLIC_UNIFORM_COLOR = 'orange'
 
 # Vehicle constraints
 MIN_VELOCITY = 0.0
@@ -36,7 +37,7 @@ VEL_RANGE = np.array([MIN_VELOCITY, NOM_VELOCITY, MAX_VELOCITY])
 MAX_ACCELERATION = 7.0 # [m/s^2] Max Accel in both X and Y direction
 
 # User settings
-V_PATH = 2.0
+V_PATH = 7.0
 MAX_ACCELERATION_PATH_FOLLOWING = 2.0 # [m/s^2] Max Accel in both X and Y direction for Max Accel formulation
 TRACK_KEEPING_SPEED_DEFAULT = 0.0 # Disable track keeping
 V_APPROACH_MIN_DEFAULT = 0.0 # Disable V_approach_min
@@ -88,7 +89,7 @@ class TrackRecord:
 
         # Initial state setting
         pos = np.array([-world_width/3, world_width/3]) # Semi-left semi-top corner
-        vel = np.array([vehicle_speed, 0.0])
+        vel = np.array([vehicle_speed, 0.0]) # Always use nom vel for initial vel
         acc = np.array([0.0, 0.0])
         initial_state = np.concatenate((pos, vel, acc), axis=None)
         self.env.reset(initial_state=initial_state)
@@ -184,6 +185,7 @@ class MC_velCurve_pointMass(unittest.TestCase):
         self.trackRecords.append(TrackRecord(HybridUnicyclic(VEL_RANGE, V_APPROACH_MIN_DEFAULT), 'Hybrid Unicyclic', path_bearing_deg, path_curvature, vehicle_speed, world_width, HYBRID_UNICYCLIC_COLOR))
         self.trackRecords.append(TrackRecord(Unicyclic(VEL_RANGE, GROUND_SPEED_DEFAULT, TRACK_KEEPING_SPEED_DEFAULT), 'Unicyclic', path_bearing_deg, path_curvature, vehicle_speed, world_width, UNICYCLIC_COLOR))
         self.trackRecords.append(TrackRecord(MaxAccelCartesianVelCurve(VEL_RANGE, MAX_ACCELERATION_PATH_FOLLOWING, MAX_ACCELERATION_PATH_FOLLOWING, V_APPROACH_MIN_DEFAULT), 'Max Acc', path_bearing_deg, path_curvature, vehicle_speed, world_width, MAX_ACCEL_COLOR))
+        self.trackRecords.append(TrackRecord(HybridUnicyclicUniform(VEL_RANGE, VEL_RANGE[1]), 'Hybrid Unicyclic Uniform', path_bearing_deg, path_curvature, vehicle_speed, world_width, HYBRID_UNICYCLIC_UNIFORM_COLOR))
 
         # Runtime user settings
         self._stop_every_1_sec = stop_every_1sec
@@ -311,6 +313,7 @@ class MC_velCurve_pointMass(unittest.TestCase):
         ax_Acc_orthogonal = fig.add_subplot(4, 2, 4, sharex=ax_V_parallel)
 
         ax_norm = fig.add_subplot(4, 2, 5, sharex=ax_V_parallel)
+        ax_track = fig.add_subplot(2, 2, 4, sharex=ax_V_parallel)
 
         # Title and Label settings
         ax_V_parallel.set_title('Velocity parallel to path')
@@ -331,6 +334,9 @@ class MC_velCurve_pointMass(unittest.TestCase):
 
         ax_norm.set_title('Velocity norm [m/s]')
         ax_norm.grid()
+
+        ax_track.set_title('Path drawn by Vel Curves')
+        ax_track.grid()
 
         # Put data
         for tr in self.trackRecords:
@@ -378,6 +384,10 @@ class MC_velCurve_pointMass(unittest.TestCase):
             ax_V_parallel.plot(track_error_array, vel_data[0], marker=GROUND_TRUTH_MARKER_TYPE, linestyle=GROUND_TRUTH_LINE_STYPE, color=color)
             ax_V_orthogonal.plot(track_error_array, vel_data[1], marker=GROUND_TRUTH_MARKER_TYPE, linestyle=GROUND_TRUTH_LINE_STYPE, color=color)
             ax_norm.plot(track_error_array, np.sqrt(np.square(vel_data[0])+np.square(vel_data[1])), marker=GROUND_TRUTH_MARKER_TYPE, linestyle=GROUND_TRUTH_LINE_STYPE, color=color)
+
+            # Draw Path
+            # X: track error (Y value), Y: path position (X value)
+            ax_track.plot(pos_array[:, 1], pos_array[:, 0], label=curve_name, marker=MARKER_TYPE, color=color)
 
         # Legend: https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.legend.html
         ax_V_parallel.legend(loc='upper right')
