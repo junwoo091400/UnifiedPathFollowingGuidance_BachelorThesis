@@ -1,0 +1,82 @@
+\chapter{Problem Definition}
+\label{ch:problem_definition}
+
+The path-following problem is to generate a desired command to guide a vehicle at a given initial configuration (position, velocity, and heading) onto a path, then have it move towards the desired direction. Unlike a conventional multirotor or a fixed wing, Hybrid VTOL can utilize both modes of the vehicle.\\
+
+We must come up with a vector field of desired ground velocities ($V_{ref}$) on a 2D plane (vertical control isn't considered). The sections below define the set of requirements that an ideal Path Following guidance for Hybrid VTOL should incorporate.
+
+\section{Output of the Path Following Guidance}
+The output of a vector field based path following guidance is a desired velocity vector. And the low-level controller is expected to actuate the vehicle to achieve the desired velocity profile.
+
+In some papers additional outputs like lateral acceleration, heading angle, etc are also formulated. However to simplify the application we do not constrain the guidance algorithm to also include any of those outputs.
+
+\section{Approaching \& On-path Velocity Constraints}
+\label{seq:approach_on_path_vel_constraints}
+
+To abide by the user-specified path following behavior, which is $V_{path}$ for the desired speed on the path, and $V_{approach}$ for desired approaching speed orthogonal to the path outside the track error boundary($e_b$), the following conditions must be satisfied:
+
+\begin{equation}
+    V_{ref}^{\perp}(e)=\begin{cases}
+    V_{approach}& \text{$e > e_b$}\\
+    0& \text{if $e = 0$}
+\end{cases}
+\label{eq:v_orth_constraints}
+\end{equation}
+
+\begin{equation}
+    V_{ref}^{\parallel}(e)=\begin{cases}
+    0& \text{if $e > e_b$}\\
+    V_{path}& \text{if $e = 0$}
+\end{cases}
+\label{eq:v_parallel_constraints}
+\end{equation}
+
+\section{Multirotor Behavior Constraints}
+
+Since the multirotor mode of operation is capable of coming to a complete stop ($V_{ref} = 0$), and has an acceleration control in any desired direction irrelevant to the heading, we can define the following constraints:
+
+\begin{equation}
+\begin{split}
+    ||V_{ref}|| < V_{max}\\
+    ||\frac{d}{dt}V_{ref}|| < a_{max}^{mc}
+\end{split}
+\label{eq:multirotor_problem_definition}
+\end{equation}
+
+\section{Fixedwing Behavior Constraints}
+Since the fixed wing mode of operation has essentially almost no control over the forward velocity ($V_{ref} = V_{nom}$), and only has a lateral acceleration control using roll angle manipulation, we can define the following constraints:
+
+\begin{equation}
+\begin{split}
+    ||V_{ref}|| = V_{nom}\\
+    ||a_{N}|| < a_{l, max}^{fw}
+\end{split}
+\label{eq:fixedwing_problem_definition}
+\end{equation}
+
+\section{Monotonicity Objective}
+Ideally, the magnitude of the desired ground velocity vector field should be monotonic, meaning while approaching the path, the norm of the desired velocity vector should not increase and decrease at any two points in time.\\
+
+Practically speaking, this ensures a smooth (vehicle either only brakes or accelerates) path approaching behavior and intuitively would prevent excessive use of acceleration. Therefore, the velocity vector field should satisfy only one of the conditions below.
+
+\begin{equation}
+    \frac{d}{dt}||V_{ref}(e)||=\begin{cases}
+    \geq 0& \text{Monotonically increasing}\\
+    \leq 0& \text{Monotonically decreasing}
+\end{cases}
+\end{equation}
+
+\section{Convergence Time Objective}
+Realistically, the path-following algorithm can't track a path with an absolute track error of zero. However, borrowing the concept of 'settling time' from control theory, we can classify the vehicle as converged to the path if the track error is within a certain threshold.\\
+
+Therefore, the idealistic path following guidance should minimize the time of reaching track error of $e_{end}$, starting from a fixed starting track error $e_{start}$ (these values must be fixed to a sane value, such as $e_{end}$ as 5\% of $e_{start}$, and $e_{start}$ as the biggest track error boundary out of all algorithms in comparison).\\
+
+And since we decouple a path parallel/orthogonal components of the desired ground velocity vector field, convergence time can be formulated like following.
+
+\begin{equation}
+\begin{split}
+T_{conv} &= \int^{e_{end}}_{e_{start}}dt\\
+&= -\int^{e_{end}}_{e_{start}}\frac{1}{V_{ref}^{\perp}(e)}de
+\end{split}
+\label{eq:convergence_time_definition}
+\end{equation}

@@ -15,13 +15,21 @@
 % german/english: German/English
 \usepackage[bt,hs,english]{packages/ethasl}
 
-% Activate for german language
-%\usepackage{german}
-%\usepackage{ae}
-
 % Graphics
 \usepackage{graphicx}
 \graphicspath{ {./images/} }
+
+% Nomenclature
+\usepackage{nomencl}
+\makenomenclature
+
+% Smart reference
+\usepackage[]{hyperref}
+% colorlinks=true, allcolors=blue
+
+% Other
+\usepackage{etoolbox} % For using ifstrequal function for nomenclature grouping 
+% \usepackage{subfig} % For grouping figures together in a single row
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % LaTeX preamble
@@ -34,19 +42,16 @@
 \begin{document}
 
 \title{Unified Path Following for Hybrid VTOLs}
-%\subtitle{bla bla bla}
 
-% TODO Add name of the authors
 \studentA{Junwoo Hwang}
 
-% TODO Add name of the supervisors
-\supervisionA{Jaeyoung Lim}
-\supervisionB{Florian Achermann}
-\supervisionC{David Rohr}
+\supervisionA{Jaeyoung Lim / Florian Achermann}
+\supervisionB{David Rohr / Thomas Stastny}
+\supervisionC{Roland Siegwart / Hwangnam Kim}
 
-% TODO Change if necessary
+% TODO: How to add professors & TJ?
+
 \projectYear{\the\year} % This year
-%\projectYear{\advance\year by -1 \the\year\advance\year by 1} % Last year
 
 \maketitle
 \pagestyle{plain}
@@ -59,30 +64,30 @@
 % TODO Modify placeholders in declaration.tex
 %\input{chapters/declaration}
 
-% \includepdf[pagecommand={}]{chapters/declaration-originality.pdf}
-
+\includepdf[pagecommand={}]{chapters/declaration-originality.pdf}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Table on contents
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 % Table of Contents depth (TODO change if necessary)
 \setcounter{tocdepth}{2}
 
+\renewcommand*\contentsname{Table of Contents}
 \tableofcontents
-\cleardoublepage
+% \cleardoublepage
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Chapters standard
+% Main content
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\input{chapters/abstract}
+
+\input{chapters/acknowledgements}
+
 % \input{chapters/preface}
-\cleardoublepage
+% \cleardoublepage
 
-% \input{chapters/abstract}
-\cleardoublepage
-
-% \input{chapters/symbols}
-\cleardoublepage
+\input{chapters/symbols}
+% \cleardoublepage
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Chapters custom
@@ -91,141 +96,40 @@
 \pagenumbering{arabic}
 
 \input{chapters/introduction}
-\cleardoublepage
+% \cleardoublepage
 
-% \input{chapters/chapter}
+\input{chapters/related_work}
+% \cleardoublepage
 
-\chapter{Problem Definition}
-\section{Vector Field Method}
+\input{chapters/problem}
+% \cleardoublepage
 
-There are different methods like Geometric, Nonlinear, Feedback linearlization, Optimal control, Model predictive control in the Path Following field.
+% Methods
+\input{chapters/methods}
+% \cleardoublepage
 
-However, Vector Field approach is the most extendable and simple for unifying the guidance output for the Hybrid VTOL use case. And thus was chosen as the basis for the formulation.
+% Evaluation
+\input{chapters/evaluation}
+% \cleardoublepage
 
-\section{Output of the Path Following Guidance}
-
-The output of a vector field based path following guidance is a desired velocity vector. And the low level controller is expected to actuate the vehicle to achieve the desired velocity profile.
-
-In some papers additional output like lateral acceleration, heading angle, etc are also formulated. However to simplify the application we do not constrain the guidance algorithm to also include any of those outputs.
-
-\section{Constraints}
-Here are the relevant constraints that a Path Following Guidance output should have:
-
-\begin{enumerate}
-    \item Holonomicity: Magnitude of the velocity curve should be holonomic while approaching the path
-    \item Convergence time: Time it takes for a vehicle at a specified point to converge within specified distance to the path
-    \item Acceleration: Acceleration required to follow the Vector Field
-\end{enumerate}
-
-\section{Terminology}
-
-Here the relevant variables for the formulation of the methods are explained.
-
-* Track error boundary
-* Approach speed
-* On-path speed
-
-\begin{figure}[h]
-\centering
-\includegraphics[width=\textwidth]{PathFollowing_Problem_v2_arrow_enlarged_simplified}
-\caption{Path Following Problem Definition}
-\end{figure}
-
-\cleardoublepage
-
-\chapter{Methods}
-\section{Unicyclic}
-
-As a base method to improve on, a Nonlinear Path Following Guidance for a Fixed Wing vehicle was chosen because the Fixed Wing presents the most conservative and constrained platform, and thus can be extended easily to incorporate more agile platform (e.g. Multirotor).
-
-Since Fixed Wing has a relatively constant forward speed, the algorithm thus assumes a 'unicyclic' motion (i.e. As if we are steering a person riding a unicycle).
-
-\begin{figure}[h]
-\centering
-\includegraphics[width=0.7\textwidth]{Unicyclic_Formulation}
-\caption{Unicyclic Formulation}
-\end{figure}
-
-** Explanation of the Unicyclic formulation
-
-\section{Hybrid}
-
-The presented formulation is noted as 'Hybrid', as it essentially is an adaptation of the Unicyclic formulation to account for a flexible velocity range  of a Multirotor.
-
-\begin{figure}[h]
-\centering
-\includegraphics[width=0.7\textwidth]{Hybrid_Formulation}
-\caption{Hybrid Formulation}
-\end{figure}
-
-** Explanation of the Hybrid formulation
-
-\section{Maximum Acceleration}
-
-This is a relaxed maximum acceleration (in path parallel, and orthogonal directions) calculation based vector field, where we assume that a vehicle approaching at $V_{approach}$ accelerates at highest possible acceleration to achieve $V_{path}$ while converging to the path.
-
-% \includegraphics[width=\textwidth]{PathFollowing_Problem_v2_arrow_enlarged_simplified}
-
-** Explanation of the Maximum Acceleration formulation
-
-\cleardoublepage
-
-\chapter{Evaluation}
-
-\section{Approach \& On-path Velocity Constraint}
-
-As expected, the $V_{approach}$ and $V_{path}$ is only expected in the Hybrid formulation.
-
-\section{Low Speed On Path}
-
-\includegraphics[width=0.7\textwidth]{VPath_0}
-
-For a case where we desire to stop on the path, the hybrid formulation successfully demonstrates that it can approach the path orthogonally and come to a full stop.
-
-\section{High Speed On Path}
-
-\includegraphics[width=0.7\textwidth]{VPath_High}
-
-For a high speed on path case, hybrid formulation shows a different approach geometry.
-
-\section{Support For Fixed Wing Case}
-
-As shown below, the Hybrid formulation still encompasses the unicyclic formulation as a special case, when the $V_{path} = V_{approach}$, which is designated as $V_{nom}$.
-
-\includegraphics[width=0.7\textwidth]{Hybrid_Supporting_Unicyclic}
-
-\cleardoublepage
-
-\chapter{Conclusion \& Future Work}
-
-This thesis successfully demonstrated that a unified guidance considering both Multirotor and Fixed Wing use cases for a Hybrid VTOL can be formulated.
-
-The Hybrid formulation, as it was designed for satisfied the most number of constraints.
-
-\section{Wind}
-Since the acceleration constraint of a Fixed Wing is tied to it's yaw angle, which in turn is tied to the wind vector, it wasn't trivial to come up with a generic solution that would cover all the different wind cases in terms of the acceleration required by the Vector Field.
-
-Therefore, it would be nice to incorporate wind more thoroughly in the guidance algorithm in the future for both Multirotor and Fixed Wing cases to create an actually optimal path following commands, and not just the ground velocity vector field.
-
-\section{Low Level Control}
-This thesis assumed that the low level controller would be capable of actuating the vehicle to track it's desired ground velocity. However, without the acceleration feed forward command directly computed from the spatial derivative of the Vector Field it would of course be challenging for the low level controller to tightly track the desired velocity.
-
-Therefore, like done in the original unicyclic formulation, it is desirable to passthrough an actual acceleration command in body frame. 
-
-\cleardoublepage
+% Conclusion
+\input{chapters/conclusion}
+% \cleardoublepage
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Bibliography
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% \bibliographystyle{bibliography/IEEEtranN}
-% \bibliography{bibliography/references}
-% \addcontentsline{toc}{chapter}{Bibliography}
-% \cleardoublepage
+\bibliographystyle{bibliography/IEEEtranN}
+\bibliography{bibliography/references.bib}
+% \printbibliography
+\addcontentsline{toc}{chapter}{Bibliography}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Appendix
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% \appendix
+\appendix
+\input{chapters/appendix_maximum_acceleration}
+
 % \input{chapters/appendix_text}
 % \cleardoublepage
 % \input{chapters/appendix_datasheets}

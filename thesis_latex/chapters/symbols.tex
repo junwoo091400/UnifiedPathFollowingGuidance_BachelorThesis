@@ -1,35 +1,48 @@
-\chapter*{Symbols}
+% Set title used in nomenclature library
+\renewcommand{\nomname}{Symbols}
+
+%% This code creates the groups
+% -----------------------------------------
+\renewcommand\nomgroup[1]{%
+  \item[\bfseries
+  \ifstrequal{#1}{V}{Vehicle constraints}{%
+  \ifstrequal{#1}{P}{Path Following parameters}{%
+  \ifstrequal{#1}{S}{Vehicle states}{}}}%
+]}
+% -----------------------------------------
+
+\nomenclature[V]{$V_{min}$}{Minimum Speed Vehicle can achieve}
+\nomenclature[V]{$V_{nom}$}{Nominal Speed Vehicle can achieve (cruise speed for Fixed Wing)}
+\nomenclature[V]{$V_{max}$}{Maximum Speed vehicle can achieve}
+\nomenclature[P]{$V_{path}$}{Desired speed on path}
+\nomenclature[P]{$V_{approach}$}{Desired approaching speed orthogonal to the path}
+\nomenclature[P]{$V_{ref}^{\parallel}$}{Target velocity component parallel to path}
+\nomenclature[P]{$V_{ref}^{\perp}$}{Target velocity component orthogonal (towards) to path}
+\nomenclature[P]{$e$}{Cross track error distance to the path}
+\nomenclature[P]{$e_{b}$}{Track error boundary}
+\nomenclature[P]{$t_{const}$}{Track error boundary time constant}
+\nomenclature[P]{$\hat{t_p}$}{Unit tangent vector of the path segment}
+\nomenclature[P]{$\overline{e}$}{Normalized track error}
+\nomenclature[S]{$\lambda$}{Course over ground}
+\nomenclature[S]{$\xi$}{Heading}
+
+% Make nomenclature chapter
+\printnomenclature
 \label{sec:symbols}
 \addcontentsline{toc}{chapter}{Symbols}
-%\chapter*{Symbolverzeichnis}
-%\label{sec:symbole}
-%\addcontentsline{toc}{chapter}{Symbolverzeichnis}
 
-\section*{Symbols}
-%\section*{Symbole}
-
-\begin{tabbing}
- \hspace*{1.6cm} \= \kill
-  $\phi, \theta, \psi$    \> roll, pitch and yaw angle \\[0.5ex] 					
-  $b$                     \> gyroscope bias \\[0.5ex]										
-  $\Omega_m$              \> 3-axis gyroscope measurement \\[0.5ex]   		
-\end{tabbing}
-
+% Indices
 \section*{Indices}
-%\section*{Indizes}
 \begin{tabbing}
  \hspace*{1.6cm}  \= \kill
  $x$ \> x axis \\[0.5ex]
  $y$ \> y axis \\[0.5ex]
 \end{tabbing}
 
+% Acronyms
 \section*{Acronyms and Abbreviations}
-%\section*{Akronyme und Abkürzungen}
 \begin{tabbing}
  \hspace*{1.6cm}  \= \kill
  ETH \> Eidgenössische Technische Hochschule \\[0.5ex]
- EKF \> Extended Kalman Filter \\[0.5ex]
- IMU \> Inertial Measurement Unit \\[0.5ex]
  UAV \> Unmanned Aerial Vehicle \\[0.5ex]
- UKF \> Unscented Kalman Filter \\[0.5ex]
 \end{tabbing}
