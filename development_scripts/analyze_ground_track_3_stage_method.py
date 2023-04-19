@@ -42,7 +42,7 @@ VGs.append(5.0*(1-e) + 10.0*e) # 5m/s on path, 10m/s when approaching
 ## Quantitative metrics
 def t_conv(laa, eb, vg):
     '''
-    Time to converge to the track error boundary (1.0 meter absolute)
+    Time to converge from the error boundary to 1.0 meter absolute offset from path
     '''
     return (eb*sympy.integrate(1/(vg*sympy.cos(laa)), (e, 1.0/eb, 1.0))).evalf()
 
@@ -75,4 +75,23 @@ def a_max(laa, eb, vg):
 
 ## Binary metrics
 
-print(a_max(LAAs[0], EBs[0], VGs[0]))
+## Scripts
+def t_conv_compare():
+    V_APPROACH = 10.0
+    V_PATH = 15.0
+
+    eb = 70.0 # Arbitrary, to 10 m/s approach roughly
+    laa = LAAs[0]
+    vg_unicyclic = 10.0 # Fixed ground speed
+    vg_hybrid = sympy.sqrt((V_APPROACH*sympy.cos(laa))**2 + (V_PATH*sympy.sin(laa)**2))
+
+    t_conv_unicyclic = t_conv(laa, eb, vg_unicyclic)
+    t_conv_hybrid = t_conv(laa, eb, vg_hybrid)
+
+    print('Time to converge: unicyclic: {}, hybrid: {}'.format(t_conv_unicyclic, t_conv_hybrid))
+    print('Pp conv: unicyclic: {}, hybrid: {}'.format(p_conv(laa, eb, vg_unicyclic), p_conv(laa, eb, vg_hybrid)))
+    print('Vg monotonic: unicyclic: {}, hybrid: {}'.format(vg_monotonic(laa, eb, vg_unicyclic), vg_monotonic(laa, eb, vg_hybrid)))
+    print('Acc rms unicyclic: {}, hybrid: {}'.format(a_rms(laa, eb, vg_unicyclic), a_rms(laa, eb, vg_hybrid)))
+
+# Execute
+t_conv_compare()
