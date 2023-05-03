@@ -29,6 +29,7 @@ Contents of this repository breaks down into following categories:
    - [Daily Dose of ASL Research](./documentations/%F0%9F%9B%ABASL%20Thesis%20Daily%20Notes.pdf): A diary I kept throughout research, where I wrote all the little details on what I'm working on & doing, etc. Give it a read if you are bored!
 3. [Scripts](./scripts/): Scripts generated during development process
 4. [Thesis LaTeX source & final file](./thesis_latex)
+5. [Final Presentation](./final_presentation/)
 
 ## Final Presentation
 
