@@ -1,5 +1,7 @@
 # Unified Path Following Guidance for Hybrid VTOLs
 
+![Banner](thesis_latex/images/fun_different_hybrid_path_curves.png)
+
 This repository contains the files related to the Bachelor Thesis project conducted at [Autonomous Systems Lab](https://asl.ethz.ch/), ETH Zurich during November 2022 ~ March 2023.
 
 Supervisors:
