@@ -27,6 +27,7 @@ Contents of this repository breaks down into following categories:
    - [Literature survey](./project_management/%F0%9F%93%9CJunwooHwang_literature_survey.pdf)
 2. [Documentations](./documentations/): Documents generated during development process
    - [Daily Dose of ASL Research](./documentations/%F0%9F%9B%ABASL%20Thesis%20Daily%20Notes.pdf): A diary I kept throughout research, where I wrote all the little details on what I'm working on & doing, etc. Give it a read if you are bored!
+   - [Vanilla NPFG Formulation - Jupyter Notebook](./documentations/3_TJ_NPFG_Scripting.ipynb): First stab I took at porting the PX4 NPFG into a python only file, whilst creating the unit tests as well. I was very satisfied with this effort!
 3. [Scripts](./scripts/): Scripts generated during development process
    - [Windywings](./scripts/windywings/): OpenAI Gym based environment to test Fixed Wing dynamics
      - [Theories](./scripts/windywings/theories/): Scripts to visualize different vector field formulation theories, as well as the vector field formulation themselves
